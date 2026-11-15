@@ -1,0 +1,12 @@
+.neon
+node_modules/
+
+.env
+.env.*
+!.env.example
+
+# Generated lossless transfer variants
+/*.gz
+/*.br
+/fonts/*.gz
+/fonts/*.br
