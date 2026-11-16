@@ -1,6 +1,6 @@
 (function(root){
   'use strict';
-  const release={version:'6.34.0',date:'2026-11-15',name:'HoMoW Living Frontiers'};
+  const release={version:'6.34.1',date:'2026-11-16',name:'HoMoW Compact Profile'};
   root.BrukRelease=Object.freeze(release);
   if(root.document){
     document.querySelectorAll('[data-game-version]').forEach(el=>el.textContent='v'+release.version);
