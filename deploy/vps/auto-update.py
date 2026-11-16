@@ -87,6 +87,12 @@ def prepare_release(checkout, root, sha):
                               'archive', '--format=tar', sha], check=True, stdout=subprocess.PIPE).stdout
     with tarfile.open(fileobj=io.BytesIO(archive)) as source:
         source.extractall(release, filter='data')
+    # data_filter ignores directory modes: systemd UMask=0077 would leave
+    # source directories 0700 and COPY would make them unreadable to USER node.
+    # The enclosing state directory stays private; .env is excluded from Docker.
+    for directory in release.rglob('*'):
+        if directory.is_dir() and not directory.is_symlink():
+            directory.chmod(0o755)
     env_file = checkout / 'deploy/vps/.env'
     link = release / 'deploy/vps/.env'
     if link.is_symlink():

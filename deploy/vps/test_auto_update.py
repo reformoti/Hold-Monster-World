@@ -1,6 +1,10 @@
 """No live infrastructure: verify deployment gating and recovery with a fake Docker."""
 import importlib.util
 import json
+import io
+import os
+import tarfile
+from types import SimpleNamespace
 from pathlib import Path
 import tempfile
 import unittest
@@ -35,6 +39,40 @@ class VerificationTests(unittest.TestCase):
         with patch.object(updater, 'request', side_effect=[{'object': {'sha': SHA}},
                           {'workflow_runs': [run, dict(run, conclusion='failure', run_attempt=2)]}]):
             self.assertIsNone(updater.verified_head())
+
+
+class ArchiveTests(unittest.TestCase):
+    def test_systemd_private_umask_does_not_make_container_source_unreadable(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            checkout = base / 'checkout'
+            env_file = checkout / 'deploy/vps/.env'
+            env_file.parent.mkdir(parents=True)
+            env_file.write_text('private configuration')
+            archive = io.BytesIO()
+            with tarfile.open(fileobj=archive, mode='w') as source:
+                for name in ['homow-server', 'deploy', 'deploy/vps']:
+                    entry = tarfile.TarInfo(name)
+                    entry.type = tarfile.DIRTYPE
+                    entry.mode = 0o755
+                    source.addfile(entry)
+                entry = tarfile.TarInfo('homow-server/server.mjs')
+                entry.mode = 0o644
+                entry.size = 7
+                source.addfile(entry, io.BytesIO(b'export;'))
+            previous_umask = os.umask(0o077)
+            try:
+                with patch.object(updater, 'git'), patch.object(updater.subprocess, 'run',
+                     return_value=SimpleNamespace(stdout=archive.getvalue())):
+                    release = updater.prepare_release(checkout, base / 'state', SHA)
+            finally:
+                os.umask(previous_umask)
+            self.assertEqual((release / 'homow-server').stat().st_mode & 0o777, 0o755)
+            self.assertEqual((release / 'deploy/vps').stat().st_mode & 0o777, 0o755)
+            self.assertEqual((release / 'homow-server/server.mjs').stat().st_mode & 0o777, 0o644)
+            self.assertTrue((release / 'deploy/vps/.env').is_symlink())
+            self.assertEqual((release / 'deploy/vps/.env').resolve(), env_file)
+            self.assertEqual(env_file.read_text(), 'private configuration')
 
 
 class DeploymentTests(unittest.TestCase):

@@ -7,5 +7,7 @@ RUN npm ci --omit=dev && npm cache clean --force
 COPY . .
 RUN npm run build
 USER node
+# Verify runtime permissions and production imports before replacing the live game.
+RUN node --input-type=module -e "await import('./homow-server/server.mjs')"
 EXPOSE 3000
 CMD ["node", "homow-server/server.mjs"]
