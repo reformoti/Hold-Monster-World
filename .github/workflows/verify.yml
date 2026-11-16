@@ -19,3 +19,5 @@ jobs:
       - run: python scripts/build-homow.py
       - run: git diff --exit-code
       - run: npm test
+      - run: bash -n deploy/vps/install-auto-update.sh
+      - run: python3 -m unittest discover -s deploy/vps -p 'test_auto_update.py'
