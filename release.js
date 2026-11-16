@@ -1,6 +1,6 @@
 (function(root){
   'use strict';
-  const release={version:'6.35.0',date:'2026-11-16',name:'HoMoW Beta Arena'};
+  const release={version:'6.35.1',date:'2026-11-16',name:'HoMoW Immersive Beta'};
   root.BrukRelease=Object.freeze(release);
   if(root.document){
     document.querySelectorAll('[data-game-version]').forEach(el=>el.textContent='v'+release.version);
