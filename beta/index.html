@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#101715"><meta name="description" content="Окрема бета HoMoW: маленька бойова арена, два монстри, меч, ривок і зілля. Без акаунта та повної карти.">
+  <title>HoMoW · Beta 0.1</title><link rel="icon" href="../icon/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="beta.css?v=0.1.0">
+  <script src="arena.js?v=0.1.0" defer></script><script src="models.js?v=0.1.0" defer></script><script src="client.js?v=0.1.0" defer></script>
+</head>
+<body>
+  <div class="beta-shell">
+    <header class="beta-header"><a class="brand" href="../">HoMoW <span>BETA 0.1</span></a><a class="full-game" href="../">Основна версія <span aria-hidden="true">›</span></a></header>
+    <main>
+      <div class="arena-heading"><div><p class="eyebrow">ОКРЕМА ТЕСТОВА АРЕНА</p><h1>Малий світ. Справжній бій.</h1></div><button id="soundToggle" class="quiet-button" type="button" aria-pressed="false">Звук: вимк.</button></div>
+      <div class="arena-layout">
+        <section class="arena-column" aria-label="Бойова арена">
+          <div class="arena-frame">
+            <canvas id="arena" width="960" height="620" tabindex="0" aria-label="Арена HoMoW. WASD або стрілки — рух. Пробіл або клік — атака. Shift — ривок. Q — зілля."></canvas>
+            <div class="hero-hud"><div class="hero-mark" aria-hidden="true">H</div><div class="vitals"><div class="hero-title"><strong>Мандрівник</strong><span>Меч і щит</span></div><div class="meter health"><span id="hpFill"></span><small id="hpText">150 / 150</small></div><div class="meter energy"><span id="energyFill"></span><small id="energyText">100 енергії</small></div></div></div>
+            <div class="arena-stamp" aria-hidden="true">ВЕРБОВА ГАЛЯВИНА<small>960 × 620 · БОЙОВИЙ ПОЛІГОН</small></div>
+            <div class="result hidden" id="result" role="dialog" aria-modal="true" aria-labelledby="resultTitle"><div><p class="eyebrow" id="resultLabel">ВИПРОБУВАННЯ ЗАВЕРШЕНО</p><h2 id="resultTitle">Галявина вільна.</h2><p id="resultDescription"></p><button id="playAgain" class="primary" type="button">Ще одна спроба</button></div></div>
+          </div>
+          <div class="controls"><div class="direction-pad" aria-label="Рух"><button type="button" data-move="0,-1" aria-label="Рух угору">↑</button><button type="button" data-move="-1,0" aria-label="Рух ліворуч">←</button><button type="button" data-move="0,1" aria-label="Рух униз">↓</button><button type="button" data-move="1,0" aria-label="Рух праворуч">→</button></div><div class="action-buttons"><button id="attack" type="button" class="attack"><strong>Удар</strong><small>SPACE / КЛІК</small></button><button id="dodge" type="button"><strong>Ривок</strong><small id="dodgeHint">SHIFT</small></button><button id="potion" type="button"><strong>Зілля <span id="potionCount">2</span></strong><small id="potionHint">Q · +65 HP</small></button></div></div>
+          <p class="arena-notice" id="notice" role="status" aria-live="polite">Здолай слиз і вовка. Червоне коло попереджає про удар.</p>
+        </section>
+        <aside class="trial-panel"><p class="eyebrow">ТВОЄ ВИПРОБУВАННЯ</p><h2>Двоє на галявині.</h2><p class="trial-copy">Тільки ти, меч і два супротивники. Перевір рух, удари та вчасний ривок.</p><div class="progress-caption"><span>Здолано</span><strong id="killCount">0 / 2</strong></div><div class="trial-progress"><span id="killFill"></span></div><div class="enemy-row" id="enemy-slime"><span class="enemy-dot slime" aria-hidden="true"></span><div><strong>Лісовий слиз</strong><small>Повільний · 70 HP</small></div><span class="enemy-status">Живий</span></div><div class="enemy-row" id="enemy-wolf"><span class="enemy-dot wolf" aria-hidden="true"></span><div><strong>Дикий вовк</strong><small>Швидкий · 135 HP</small></div><span class="enemy-status">Живий</span></div><button id="restart" type="button" class="quiet-button restart">Почати заново</button><details><summary>Як грати</summary><p>Рухайся WASD, стрілками або кнопками під ареною. Для удару наведи курсор на ворога й натисни ліву кнопку миші чи пробіл. На телефоні повернись до ворога й натисни «Удар».</p><p>Ривок на Shift дає коротку невразливість. Q відновлює 65 HP; є два зілля. Усі цілі відновлюються після перезапуску.</p><p>Це окреме локальне випробування: без входу й запису прогресу основної гри.</p></details></aside>
+      </div>
+    </main>
+    <footer><span>HoMoW · експериментальна збірка</span><span>Одна арена · два монстри</span></footer>
+  </div>
+</body></html>
