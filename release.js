@@ -1,6 +1,6 @@
 (function(root){
   'use strict';
-  const release={version:'6.37.0',date:'2026-11-16',name:'HoMoW 3D Frontiers'};
+  const release={version:'6.37.1',date:'2026-11-17',name:'HoMoW Free Aim'};
   root.BrukRelease=Object.freeze(release);
   if(root.document){
     document.querySelectorAll('[data-game-version]').forEach(el=>el.textContent='v'+release.version);

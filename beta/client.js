@@ -1,6 +1,6 @@
 /* Beta-only presentation and input. The main game is neither loaded nor connected. */
 (()=>{'use strict';
-  const {Arena,TYPES,WIDTH,HEIGHT,distance}=window.HoMoWArena,M=window.BrukRealmModels,V=window.HoMoWBetaView;
+  const {Arena,TYPES,WIDTH,HEIGHT}=window.HoMoWArena,M=window.BrukRealmModels,V=window.HoMoWBetaView;
   const $=id=>document.getElementById(id),canvas=$('arena'),c=canvas.getContext('2d'),terrain=document.createElement('canvas');terrain.width=WIDTH;terrain.height=HEIGHT;
   const mini=$('minimap').getContext('2d'),fullMap=$('areaMap').getContext('2d'),miniTerrain=document.createElement('canvas');miniTerrain.width=miniTerrain.height=200;
   const settings=$('settingsDialog'),mapDialog=$('mapDialog');
@@ -42,7 +42,9 @@
   function tone(kind){if(!sound||!audio||audio.state!=='running')return;const now=audio.currentTime,o=audio.createOscillator(),gain=audio.createGain(),healing=kind==='potion'||kind==='won';o.type=kind==='sword'?'sawtooth':'triangle';o.frequency.setValueAtTime(healing?350:kind==='step'?145:180,now);o.frequency.exponentialRampToValueAtTime(healing?880:45,now+.14);gain.gain.setValueAtTime(kind==='step'?.025:.075,now);gain.gain.exponentialRampToValueAtTime(.001,now+.17);o.connect(gain);gain.connect(audio.destination);o.start();o.stop(now+.18);o.onended=()=>{o.disconnect();gain.disconnect();};}
   $('soundToggle').onclick=()=>{sound=!sound;$('soundToggle').setAttribute('aria-pressed',String(sound));$('soundToggle').textContent=sound?'Звук: увімк.':'Звук: вимк.';unlock();};
   function clearInput(){cameraDrag=null;keys.clear();touches.clear();for(const b of document.querySelectorAll('[data-move]'))b.classList.remove('pressed');}
-  function attack(){if(modalOpen())return;unlock();if(aimPoint){updateView();const target=scene3d?scene3d.pick(aimPoint.x,aimPoint.y):V.toWorld(aimPoint.x,aimPoint.y,view);world.aim(target.x,target.y);}else{const target=world.monsters.filter(m=>m.alive&&distance(m,world.state)<110).sort((a,b)=>distance(a,world.state)-distance(b,world.state))[0];if(target)world.aim(target.x,target.y);}world.attack();}
+  // Never inspect enemies when choosing a strike direction.
+  function aimTarget(){if(!aimPoint)return null;updateView();return scene3d?scene3d.pick(aimPoint.x,aimPoint.y):V.toWorld(aimPoint.x,aimPoint.y,view);}
+  function attack(){if(modalOpen())return;unlock();world.attack(aimTarget());}
   function dodge(){if(modalOpen())return;unlock();if(!world.dodge(input()))say(world.state.energy<25?'Для ривка потрібно 25 енергії.':'Ривок ще відновлюється.');}
   function potion(){if(modalOpen())return;unlock();if(!world.potion())say(world.potions===0?'Зілля закінчилося.':world.state.hp===world.state.maxHp?'Здоров’я вже повне.':'Зілля ще відновлюється.');}
   function restart(){world=new Arena();floaters.length=0;aimPoint=null;lastTime=null;lastStep=0;clearInput();$('result').classList.add('hidden');say('Нова спроба. На галявині знову двоє супротивників.');hud();canvas.focus({preventScroll:true});}
@@ -95,6 +97,7 @@
     buttons.attack.disabled=!!world.result;buttons.dodge.disabled=!!world.result;buttons.potion.disabled=!!world.result||world.potions===0;drawMaps();
   }
   function render(dt){
+    const aiming=!!aimPoint&&!cameraDrag&&!modalOpen()&&!paused&&!world.result;world.aiming=aiming;const reticle=$('aimReticle');reticle.classList.toggle('hidden',!aiming);if(aiming){reticle.style.left=aimPoint.x+'px';reticle.style.top=aimPoint.y+'px';}
     if(scene3d){updateView();for(let i=floaters.length-1;i>=0;i--){if(!paused&&!modalOpen())floaters[i].life-=dt;if(floaters[i].life<=0)floaters.splice(i,1);}scene3d.render(world,floaters);return;}
     updateView();const scale=view.scale*pixelRatio;c.setTransform(scale,0,0,scale,-view.x*scale,-view.y*scale);c.drawImage(terrain,0,0);M.camp(c,{time:world.time,camp:{x:225,y:475}});
     for(const m of world.monsters){if(!m.alive){c.strokeStyle='#293c2e55';c.lineWidth=2;c.beginPath();c.ellipse(m.x,m.y,22,8,0,0,Math.PI*2);c.stroke();continue;}if(m.windup>0){const info=TYPES[m.type],ratio=1-m.windup/info.windup;c.fillStyle='#b8593f22';c.strokeStyle='#e89a6a';c.lineWidth=2;c.beginPath();c.arc(m.x,m.y,info.range+15,0,Math.PI*2);c.fill();c.stroke();c.beginPath();c.arc(m.x,m.y,info.range+15,-Math.PI/2,-Math.PI/2+Math.PI*2*ratio);c.lineWidth=5;c.stroke();}}
@@ -106,6 +109,6 @@
     for(let i=floaters.length-1;i>=0;i--){const f=floaters[i];if(!paused&&!modalOpen())f.life-=dt;if(f.life<=0){floaters.splice(i,1);continue;}c.globalAlpha=Math.min(1,f.life*3);c.font='bold 16px system-ui';c.textAlign='center';c.fillStyle=f.type==='potion'?'#d1ed9c':f.type==='hurt'?'#ffd2b2':'#fff0bf';c.fillText(f.text,f.x,f.y-(1-f.life)*35);}c.globalAlpha=1;
     if((paused||modalOpen())&&!world.result){c.fillStyle='#10201b66';c.fillRect(0,0,WIDTH,HEIGHT);c.fillStyle='#f2e5bd';c.font=(24/view.scale)+'px Georgia';c.textAlign='center';c.fillText('Пауза',view.x+view.width/2,view.y+view.height/2);}
   }
-  function frame(now){const dt=lastTime===null?0:Math.min(.05,(now-lastTime)/1000);lastTime=now;if(!paused&&!modalOpen())world.step(dt,input());processEvents();if(world.walking&&sound&&world.time-lastStep>.36){lastStep=world.time;tone('step');}render(dt);if(now-lastHud>80){hud();lastHud=now;}if(noticeUntil&&now>noticeUntil){$('notice').textContent='WASD — рух · SPACE / клік — удар · SHIFT — ривок · Q — зілля';noticeUntil=0;}requestAnimationFrame(frame);}
+  function frame(now){const dt=lastTime===null?0:Math.min(.05,(now-lastTime)/1000);lastTime=now;if(!paused&&!modalOpen()){world.step(dt,input());const target=aimTarget();if(target&&!cameraDrag)world.aim(target.x,target.y);}processEvents();if(world.walking&&sound&&world.time-lastStep>.36){lastStep=world.time;tone('step');}render(dt);if(now-lastHud>80){hud();lastHud=now;}if(noticeUntil&&now>noticeUntil){$('notice').textContent='Наведи приціл · SPACE / ЛКМ — удар · SHIFT — ривок · Q — зілля';noticeUntil=0;}requestAnimationFrame(frame);}
   hud();requestAnimationFrame(frame);
 })();

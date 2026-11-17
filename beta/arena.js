@@ -13,9 +13,10 @@
     }
     emit(type,x=this.state.x,y=this.state.y,text=''){this.events.push({type,x,y,text});}
     drainEvents(){return this.events.splice(0);}
-    aim(x,y){if(Number.isFinite(x)&&Number.isFinite(y)&&distance(this.state,{x,y})>1)this.facing=unit(x-this.state.x,y-this.state.y);}
-    attack(){
+    aim(x,y){if(this.result||this.swing>0)return;if(Number.isFinite(x)&&Number.isFinite(y)&&distance(this.state,{x,y})>1)this.facing=unit(x-this.state.x,y-this.state.y);}
+    attack(target){
       if(this.result||this.attackCooldown>0||this.dashTime>0)return false;
+      if(target)this.aim(target.x,target.y);
       this.attackCooldown=.44;this.swing=.3;this.emit('sword');
       for(const m of this.monsters){
         if(!m.alive||distance(this.state,m)>95)continue;
@@ -30,7 +31,7 @@
     dodge(direction){
       if(this.result||this.dodgeCooldown>0||this.state.energy<25)return false;
       this.dashDirection=direction&&Math.hypot(direction.x,direction.y)>0?unit(direction.x,direction.y):{...this.facing};
-      this.facing={...this.dashDirection};this.dashTime=.19;this.invulnerable=.28;this.dodgeCooldown=2;this.state.energy-=25;this.emit('dodge');return true;
+      this.swing=0;this.facing={...this.dashDirection};this.dashTime=.19;this.invulnerable=.28;this.dodgeCooldown=2;this.state.energy-=25;this.emit('dodge');return true;
     }
     potion(){
       if(this.result||this.potions===0||this.potionCooldown>0||this.state.hp===this.state.maxHp)return false;
@@ -45,7 +46,7 @@
       const x=Number.isFinite(input.x)?clamp(input.x,-1,1):0,y=Number.isFinite(input.y)?clamp(input.y,-1,1):0,moving=Math.hypot(x,y)>0,direction=unit(x,y);
       this.walking=moving||this.dashTime>0;
       if(this.dashTime>0){this.state.x+=this.dashDirection.x*600*dt;this.state.y+=this.dashDirection.y*600*dt;}
-      else if(moving){this.state.x+=direction.x*175*dt;this.state.y+=direction.y*175*dt;this.facing=direction;}
+      else if(moving){this.state.x+=direction.x*175*dt;this.state.y+=direction.y*175*dt;if(this.swing===0)this.facing=direction;}
       this.state.x=clamp(this.state.x,58,WIDTH-58);this.state.y=clamp(this.state.y,110,HEIGHT-50);
       if(this.walking)this.footstep+=dt*(this.dashTime>0?22:11);
       for(const effect of this.effects)effect.life-=dt;this.effects=this.effects.filter(e=>e.life>0);
