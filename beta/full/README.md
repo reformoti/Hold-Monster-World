@@ -1,8 +1,8 @@
-# Full-world 3D beta 0.5.0 — 2026-11-18
+# Full-world 3D beta 0.5.1 — 2026-11-18
 
 Entry: `beta/full/index.html`. The existing beta arena links here; the stable entry and server are unchanged.
 
-This is the first integration milestone, **not a complete 3D port**. It imports canonical game data, simulation and UI, and replaces the world renderer with native WebGL geometry (software fallback). No production API calls or account mutations are enabled. Test progress uses `homow_beta_full_v1`; it does not read or replace the stable save. Shared UI preferences still use the existing settings keys.
+This is the first integration milestone, **not a complete 3D port**. It imports canonical game data, simulation and UI, and replaces the world renderer with native WebGL geometry (software fallback). No production API calls or account mutations are enabled. Test progress uses `homow_beta_full_v1`; it does not read or replace the stable save. Beta preferences use homow_beta_options_v1 and the interface is Ukrainian, independently of stable preferences.
 
 ## Rebuild and verify
 
@@ -38,6 +38,6 @@ WASD/arrows move relative to the camera; left click/Space attacks; Q uses a poti
 | Settings, localization, music | Canonical modules | Partial | Settings boot; 3D render resolution applied; shadows/texture controls need parity |
 | Performance | Existing probe and culling | Unmeasured | No browser FPS, ping or long-session memory measurements |
 
-The runtime smoke test uses a mocked canvas/DOM and software 3D. It does not verify browser GPU output, actual FPS, button layout or full playability. The published stable version remains 6.37.2; only this beta has version 0.5.0.
+The runtime smoke test uses a mocked canvas/DOM and software 3D. It does not verify browser GPU output, actual FPS, button layout or full playability. The published stable version remains 6.37.2; only this beta has version 0.5.1.
 
 Next milestones: visual browser playtest, all equipment/monster model families and combat effects, directional skills, complete menu/quest/dungeon playthrough, then a beta-specific server protocol for directional attacks and shared accounts without changing stable behavior.

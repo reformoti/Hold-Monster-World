@@ -21,3 +21,5 @@ test('canonical full UI boots and renders all clusters with software 3D without 
  document.getElementById('inventoryAction').click();assert(document.getElementById('inventoryDialog').open);document.getElementById('closeInventory').click();document.getElementById('masteryAction').click();assert(document.getElementById('masteryDialog').open);
  assert(!storage.has('brukivka_realms_v1'));
 });
+
+test('beta uses Ukrainian even with an old foreign locale, without changing stable preferences',()=>{const O=require('./options.js');assert.equal(O.KEY,'homow_beta_options_v1');for(const locale of ['uk','en','de','pt'])assert.equal(O.normalize({locale}).locale,'uk');const html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');assert(html.includes('src="options.js?v=0.5.1"'));assert(!html.includes('src="../../homow-options.js'));});
