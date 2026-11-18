@@ -1,0 +1,1 @@
+window.BrukRelease=Object.freeze({version:'0.6.0',date:'2026-11-18',name:'3D-бета'});document.querySelectorAll('[data-game-version]').forEach(el=>el.textContent='v0.6.0 · БЕТА');document.title='HoMoW · 3D-бета 0.6.0';
