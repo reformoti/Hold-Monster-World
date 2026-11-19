@@ -23,6 +23,11 @@ test('canonical full UI boots and renders all clusters with software 3D without 
  assert.equal(oreSnapshot.length,world.nodes.length);for(const original of oreSnapshot){const n=world.nodes.find(n=>n.id===original.id);assert.equal(n.type,original.type);assert.equal(betaR.clusterOf(n),betaR.inVillage(n.x,n.y)?'village':original.cluster,'resource keeps region '+n.id);}
  const ores=world.nodes.filter(n=>betaR.NODE_TYPES[n.type].tool==='pickaxe');for(const n of ores){assert(!betaR.inVillage(n.x,n.y)&&!betaR.inCity(n.x,n.y),'ore outside towns '+n.id);assert(!betaR.blocked(n.x,n.y,30),'ore clear '+n.id);assert(betaR.PORTALS.every(p=>Math.hypot(p.x-n.x,p.y-n.y)>150),'portal access '+n.id);}
 
+ const L=env.HoMoWLayout;assert.equal(L.report.nodes,190);assert.equal(L.report.spawns,141);
+ assert(!betaR.blocked(betaR.BILLBOARD.x,betaR.BILLBOARD.y,85),'open billboard square');assert(betaR.findPath(betaR.CAMP.x,betaR.CAMP.y,betaR.BILLBOARD.x,betaR.BILLBOARD.y).length,'path to board');
+ for(const n of world.nodes){assert(L.free(n,50),'clear resource '+n.id);if(!betaR.clusterOf(n).startsWith('dungeon:'))assert(L.roadFree(n,64),'resource off road '+n.id);assert(L.gateFree(n,180),'resource off gate '+n.id);}
+ for(const m of world.monsters.filter(m=>!betaR.clusterOf(m).startsWith('dungeon:'))){const r=betaR.TYPES[m.type].radius;assert(L.free(m,r+20),'clear mob camp '+m.id);assert(!betaR.inVillage(m.x,m.y)&&!betaR.inCity(m.x,m.y));assert(L.gateFree(m,235),'camp off gate '+m.id);assert(world.nodes.every(n=>Math.hypot(n.x-m.x,n.y-m.y)>r+85),'camp off resource '+m.id);}
+ const probe=world.monsters.find(m=>!betaR.clusterOf(m).startsWith('dungeon:')),home={x:probe.x,y:probe.y};const deposit=world.nodes.find(n=>betaR.clusterOf(n)===betaR.clusterOf(probe)&&L.free({x:n.x-85,y:n.y},30));assert(deposit);probe.x=deposit.x-85;probe.y=deposit.y;for(let i=0;i<80;i++){const dx=deposit.x-probe.x,dy=deposit.y-probe.y,len=Math.hypot(dx,dy)||1;world.moveEntity(probe,dx/len*5,dy/len*5,1);assert(Math.hypot(probe.x-deposit.x,probe.y-deposit.y)>betaR.TYPES[probe.type].radius+31,'mob never enters resource');}Object.assign(probe,home);
  for(const h of betaR.HOUSES)assert(betaR.blocked(h.x+h.w/2,h.y+h.h/2),'house collider '+h.owner);
  for(const n of Object.values(betaR.TRADERS)){assert(!betaR.blocked(n.x,n.y,18),'NPC access '+n.name);const path=betaR.findPath(betaR.SPAWN.x,betaR.SPAWN.y,n.x,n.y);assert(path.length&&Math.hypot(path.at(-1).x-n.x,path.at(-1).y-n.y)<65,'route to '+n.name);}
  for(const n of world.nodes.filter(n=>betaR.inVillage(n.x,n.y)))assert(!betaR.blocked(n.x,n.y,15),'resource access '+n.id);
@@ -38,7 +43,7 @@ test('canonical full UI boots and renders all clusters with software 3D without 
  assert(!storage.has('brukivka_realms_v1'));const before=world.state.x;pending.shift()(1000);pending.shift()(4500);assert(storage.has('homow_beta_full_v1'));assert(!storage.has('brukivka_realms_v1'));
 });
 
-test('beta uses Ukrainian even with an old foreign locale, without changing stable preferences',()=>{const O=require('./options.js');assert.equal(O.KEY,'homow_beta_options_v1');for(const locale of ['uk','en','de','pt'])assert.equal(O.normalize({locale}).locale,'uk');const html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');assert(html.includes('src="options.js?v=0.10.1"'));assert(!html.includes('src="../homow-options.js'));});
+test('beta uses Ukrainian even with an old foreign locale, without changing stable preferences',()=>{const O=require('./options.js');assert.equal(O.KEY,'homow_beta_options_v1');for(const locale of ['uk','en','de','pt'])assert.equal(O.normalize({locale}).locale,'uk');const html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');assert(html.includes('src="options.js?v=0.11.0"'));assert(!html.includes('src="../homow-options.js'));});
 
 test('a swing keeps its aim during movement and pointer changes',()=>{const w=new World();w.monsters=[];w.aimTarget={x:w.state.x,y:w.state.y-100};w.attack();const facing={...w.facing};w.aimTarget={x:w.state.x+100,y:w.state.y};w.update(.05,{x:1});assert.deepEqual(w.facing,facing);for(let i=0;i<8;i++)w.update(.05,{x:1});assert(w.facing.x>0);});
 

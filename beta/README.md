@@ -61,3 +61,6 @@ Compact bag cells and a clean portrait pedestal after visual verification.
 Shared detailed 3D donkey, horse, direwolf and armored horse models in the world and shop. Transparent inventory portraits without a pedestal. Expanded village streets and clearer merchant service labels. Gate destination signs, visible neighboring buildings and a brief arrival banner. Existing mount ownership, prices and stats retained.
 
 0.10.1: show each gateway and its destination from both connected clusters.
+
+## 0.11.0 · 2026-11-19
+All resource nodes and overworld monster camps are validated against obstacles, roads, gates, settlement boundaries and each other. Billboard moved to an open village square. Roads now share their exact geometry with both maps. Gate lintels follow the boundary axis and straight approaches. Monster motion checks full body clearance, resource deposits and its own cluster, including charges; old player saves inside a relocated obstacle are moved to a nearby clear point. Expensive layout planning runs in `plan-layout.cjs` during the build; `layout.js` applies its generated data at startup. Stable content, prices and saved ownership are unchanged.

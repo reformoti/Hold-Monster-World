@@ -54,7 +54,7 @@ window.HoMoWEnvironment={
  if(kind==='lantern'){p(0,42,0,5,84,5,'6b6452');p(0,84,0,16,18,16,'ead58c');p(0,96,0,21,10,21,'5f7783','roof');return;}
  for(let i=0;i<(kind==='barrels'?2:3);i++){const dx=(i-1)*15;p(dx,13,0,14,25,17,kind==='barrels'?'b7894c':'c19a5c',kind==='barrels'?'sphere':'cube');for(const y of [7,20])p(dx,y,0,16,3,18,'6d786d');}
  },
- villageGround(w){const R=window.BrukRealms;if(!R.inVillage(w.state.x,w.state.y))return;this.villagePaths??=Object.values(R.TRADERS).map(n=>[{x:n.x,y:n.y},...R.findPath(n.x,n.y,R.CAMP.x,R.CAMP.y)]);
+ villageGround(w){const R=window.BrukRealms;if(!R.inVillage(w.state.x,w.state.y))return;this.villagePaths??=window.HoMoWGeography.roads.get('village');
  for(const points of this.villagePaths)for(let i=1;i<points.length;i++){const a=points[i-1],b=points[i],dx=b.x-a.x,dz=b.y-a.y,l=Math.hypot(dx,dz);this.draw('cube',(a.x+b.x)/2,0,(a.y+b.y)/2,l+4,1,27,'c5b27a',-Math.atan2(dz,dx));}
  this.draw('sphere',R.CAMP.x,1,R.CAMP.y,62,1,56,'d1c28e');for(let i=0;i<12;i++){const a=i*Math.PI/6;this.draw('cube',R.CAMP.x+Math.cos(a)*52,2,R.CAMP.y+Math.sin(a)*48,9,3,9,'e3d2a8',a);}
  for(let i=0;i<8;i++){const a=i*Math.PI/4;this.draw('sphere',R.CAMP.x+Math.cos(a)*16,4,R.CAMP.y+Math.sin(a)*16,6,5,5,'a1a897');}for(const a of [-.6,.6])this.draw('cube',R.CAMP.x,5,R.CAMP.y,8,7,33,'96633d',a);for(let i=0;i<3;i++)this.draw('cone',R.CAMP.x+(i-1)*5,7,R.CAMP.y,6,19+(this.opt?.animations===false?0:Math.sin(w.time*5+i)*4),6,i%2?'ffe29a':'ffad56');
