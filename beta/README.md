@@ -59,3 +59,5 @@ Compact bag cells and a clean portrait pedestal after visual verification.
 
 ## 0.10.0 · 2026-11-19
 Shared detailed 3D donkey, horse, direwolf and armored horse models in the world and shop. Transparent inventory portraits without a pedestal. Expanded village streets and clearer merchant service labels. Gate destination signs, visible neighboring buildings and a brief arrival banner. Existing mount ownership, prices and stats retained.
+
+0.10.1: show each gateway and its destination from both connected clusters.

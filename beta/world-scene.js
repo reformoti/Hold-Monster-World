@@ -64,7 +64,7 @@ class Scene extends window.HoMoWBeta3D.Scene{
  if(!w.state.passUnlocked&&this.visibleAt({x:R.PASS.barrierX,y:R.PASS.y+R.PASS.h/2}))this.draw('cube',R.PASS.barrierX,45,R.PASS.y+R.PASS.h/2,20,90,R.PASS.h,'7a8475');
  const run=w.state.expeditions.run,dungeon=R.DUNGEONS.find(d=>d.id===run?.id);
  if(dungeon){for(const gate of dungeon.gates)if(run.stage<gate.stage)this.draw('cube',gate.x+gate.w/2,35,gate.y+gate.h/2,gate.w,70,gate.h,'899c9e');for(const [p,name]of [[dungeon.chest,'E · Скриня'],[dungeon.exit,'E · Вихід']]){this.draw('cube',p.x,15,p.y,32,30,25,'bba36c');this.tag(name,p.x,p.y,65);}}
- for(const p of R.PORTALS){if(!show(p))continue;for(const side of [-1,1])this.draw('cube',p.x+side*35,40,p.y,14,80,18,'a6b0a0');this.draw('cube',p.x,86,p.y,90,15,18,'cab981');const current=R.clusterOf(w.state),to=R.CLUSTERS.find(c=>c.id===(p.a===current?p.b:p.a));this.tag((to?.name||'Перехід')+'\nWASD · пройти / E',p.x,p.y,115,null);}
+ for(const p of R.PORTALS){if(![p.a,p.b].includes(cluster)||!this.visibleAt(p,200))continue;for(const side of [-1,1])this.draw('cube',p.x+side*35,40,p.y,14,80,18,'a6b0a0');this.draw('cube',p.x,86,p.y,90,15,18,'cab981');const current=R.clusterOf(w.state),to=R.CLUSTERS.find(c=>c.id===(p.a===current?p.b:p.a));this.tag((to?.name||'Перехід')+'\nWASD · пройти / E',p.x,p.y,115,null);}
  for(const d of R.DUNGEONS){const p=d.entry;if(p&&show(p)){this.draw('cone',p.x,1,p.y,65,90,60,'566873');this.tag(d.name,p.x,p.y,110);}}
  if(show(R.MONOLITH)){const p=R.MONOLITH;this.draw('cube',p.x,62,p.y,35,124,35,w.state.monolithAwakened?'7fc6ba':'74877b');this.tag('E · Моноліт',p.x,p.y,145);}
  if(show(R.BILLBOARD)){const p=R.BILLBOARD;this.draw('cube',p.x,40,p.y,65,50,10,'9e8b60');this.tag('E · Дошка пошани',p.x,p.y,85);}
