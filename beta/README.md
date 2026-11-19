@@ -45,3 +45,11 @@ npm test
 ## 0.8.0 · Краї, руди та хода
 
 За краєм поточного кластера видно сусідній ландшафт. Зовнішній край світу оформлено береговими скелями, водою та далекими скелястими островами; за межі ігрової карти персонаж не виходить. Руди винесено за межі села й міста до вільних кам’яних ділянок, без перекриття входів і переходів; ID, тир, кластер і запаси зберігаються. Хода рахує кроки за реальною пройденою відстанню, зупиняє анімацію біля стін і плавно повертає візуальну модель. Згладжування відображення не змінює збережені координати; переходи між кластерами показуються одразу.
+
+## 0.9.0 · 2026-11-19
+- Six tree silhouettes, variable sizes and seasonal foliage.
+- A separate safe village cluster with four working gates.
+- Mountain, woodland and water borders with clear crossings; regional footpaths.
+- Matching bright atlas/minimap palette and visible town district.
+- Responsive inventory panels with a rotatable 3D equipment/appearance preview.
+- All changes are beta-only; stable save and source files stay untouched.

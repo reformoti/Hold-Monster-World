@@ -45,7 +45,7 @@ class Scene extends window.HoMoWBeta3D.Scene{
  const staticKey=this.cpu?[this.width,this.height,this.cx,this.cz,this.yaw,this.zoom,this.opt.shadows,this.opt.lowTextures,cluster,w.nodes.map(n=>n.charges).join(',')].join(':'):null;
  if(this.cpu&&staticKey===this.staticKey){this.faces=this.cachedFaces.slice();this.visible=this.cachedVisible;}else{
  this.horizon(w);
- const biome=R.clusterAt(w.state.x,w.state.y).biome;this.draw('cube',area.x+area.w/2,-7,area.y+area.h/2,area.w,10,area.h,({plains:'8dc468',forest:'61a36d',swamp:'71a68b',winter:'c6e3e7'})[biome]);this.villageGround(w);
+ const biome=R.clusterAt(w.state.x,w.state.y).biome;this.draw('cube',area.x+area.w/2,-7,area.y+area.h/2,area.w,10,area.h,({plains:'8dc468',forest:'61a36d',swamp:'71a68b',winter:'c6e3e7'})[biome]);this.villageGround(w);this.roads(w);this.frontiers(w);
  for(const o of R.OBSTACLES){const center={x:o.x+o.w/2,y:o.y+o.h/2};if(R.clusterOf(center)!==cluster||!this.visibleAt(center,Math.max(o.w,o.h)))continue;
   if(o.betaKind)this.prop(o,w.time);
   else if(o.type==='house')this.building(o,w.time);

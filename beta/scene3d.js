@@ -37,8 +37,8 @@ class Scene{
  for(let i=0;i<3;i++)this.draw('cube',175+i*12,9,495,10,16,52,'816b49',.35);
  }
  hero(w){
- const s=w.state,a=Math.atan2(w.facing.x,w.facing.y),gait=w.gait??(w.walking?1:0),stride=Math.sin(w.footstep)*gait,bob=Math.abs(stride)*1.4+(1-gait)*Math.sin(w.time*2)*.25;
- const part=(x,y,z,sx,sy,sz,col,turn=a,kind='cube')=>this.draw(kind,s.x+x*Math.cos(a)+z*Math.sin(a),y+bob,s.y-x*Math.sin(a)+z*Math.cos(a),sx,sy,sz,col,turn);
+ const s=w.state,look=s.appearance||{},R=window.BrukRealms,skin=(R?.APPEARANCE.skin[look.skin]||'#d4b28d').slice(1),hair=(R?.APPEARANCE.hair[look.hair]||'#62452e').slice(1),accent=(R?.APPEARANCE.accent[look.accent]||'#315c60').slice(1),a=Math.atan2(w.facing.x,w.facing.y),gait=w.gait??(w.walking?1:0),stride=Math.sin(w.footstep)*gait,bob=Math.abs(stride)*1.4+(1-gait)*Math.sin(w.time*2)*.25;
+ const part=(x,y,z,sx,sy,sz,col,turn=a,kind='cube')=>this.draw(kind,s.x+x*Math.cos(a)+z*Math.sin(a),y+bob,s.y-x*Math.sin(a)+z*Math.cos(a),sx*(look.body==='broad'?1.12:look.body==='slim'?.9:1),sy,sz,({'d4b28d':skin,'b78f70':skin,'c19a79':skin,'bb9272':skin,'62452e':hair,'705035':hair,'795638':hair,'654a35':hair,'315c60':accent,'3a6b6b':accent})[col]||col,turn);
  this.draw('sphere',s.x,1,s.y,26,1,19,'53644d');
  // Layered cloak, fitted cuirass and leather under-armour.
  part(0,43,-12,28,36,4,'315c60');part(0,25,-15-Math.sin(w.footstep)*1.5*gait,30,12,4,'3a6b6b');part(0,20,-16,31,3,4,'b59c67');
@@ -53,7 +53,7 @@ class Scene{
  // Neck, ears, two eyes, brows, nose and layered swept hair.
  part(0,60,0,10,7,11,'b78f70');part(0,70,0,19,20,18,'d4b28d');for(const x of [-10,10])part(x,69,0,3,6,5,'c19a79');
  part(-5,71,9.4,3,2.5,1,'26383c');part(5,71,9.4,3,2.5,1,'26383c');part(-5,74,9.5,5,1.5,1,'654a35');part(5,74,9.5,5,1.5,1,'654a35');part(0,68,10,3,4,3,'bb9272');part(0,64,9.5,5,1,1,'906d57');
- part(0,80,-1,22,6,21,'62452e');part(0,73,-9,21,13,4,'62452e');part(-9,75,1,4,9,13,'705035');part(3,83,0,15,3,16,'795638');part(-5,78,6,9,5,8,'705035');
+ if(look.style!=='shaved'){part(0,80,-1,22,6,21,'62452e');part(0,73,-9,21,13,4,'62452e');part(-9,75,1,4,9,13,'705035');part(3,83,0,15,3,16,'795638');part(-5,78,6,9,5,8,'705035');if(['long','braids'].includes(look.style))for(const side of [-1,1])part(side*10,62,-7,look.style==='braids'?5:8,25,7,hair);}
  // Every sword component shares the hand pivot, including the guard and pommel.
  if((s.weaponKind||'sword')==='sword'){
  const progress=1-w.swing/.3,arc=w.swing>0?(-1.05+2.1*Math.sin(progress*Math.PI/2)):.12,turn=a+arc;
@@ -63,7 +63,7 @@ class Scene{
  sword(8,32,19,5,4,'d4bd83');for(const x of [-9,9])sword(10,32,4,5,7,'b89e63','cube',x);
  sword(11,32,9,9,49,'d7e6e5','blade');sword(24,33.3,1.2,1,22,'f1f4e8');
  }else this.weapon?.(w,a,bob);
- if(s.appearance?.beard&&s.appearance.beard!=='none')part(0,61,8,14,9,5,'654a35');
+ if(s.appearance?.beard&&s.appearance.beard!=='none')part(0,look.beard==='full'?59:63,8,14,look.beard==='full'?13:4,5,hair);
  if(s.outfits?.head)part(0,81,0,24,7,23,s.outfits.head==='soldier_helm'?'a5b8b6':'526d58');
  if(s.supportKind==='focus'&&!w.twoHanded)part(-25,39,10,6,23,17,'9479a6');
  if(s.supportKind==='torch'&&!w.twoHanded){part(-25,40,10,4,30,4,'81684b');part(-25,57,10,6,13,6,'edb774',a,'cone');}
@@ -74,4 +74,4 @@ class Scene{
  tree(x,z,i){this.draw('cone',x+15,1,z+10,26,1,19,'59744f');this.draw('cube',x,25,z,12,50,12,'76644a');this.draw('cone',x,35,z,30,75+(i%3)*12,30,i%2?'3b6050':'526c48');this.draw('cone',x,63,z,23,62,23,i%2?'456e57':'607b52');}
  label(index,x,z,y,visible,health=1){const el=this.labels[index],p=this.project(x,z,y);el.style.display=visible?'block':'none';el.style.left=p.x+'px';el.style.top=p.y+'px';el.querySelector('b').style.width=Math.max(0,health)*100+'%';}
 }
-window.HoMoWBeta3D={Scene};})();
+window.HoMoWBeta3D={Scene,meshData};})();

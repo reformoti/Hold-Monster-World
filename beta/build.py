@@ -3,7 +3,7 @@ from pathlib import Path
 import re
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
-VERSION = '0.8.0'
+VERSION = '0.9.0'
 
 def replace_once(text, old, new):
     if text.count(old) != 1:
@@ -22,14 +22,14 @@ def build():
     # Every canonical asset stays in its original directory, including CSS URLs.
     html = re.sub(r'(src|href)="(?!https?:|#)([^"\s]+)"', lambda m: m[1]+'="../'+m[2]+'"', html)
     html = re.sub(r'<script src="../(?:cloud-guard|achievement-events|homow-cloud|homow-online)\.js[^>]*></script>', '', html)
-    html = re.sub(r'(<script src="../realms-evolution\.js[^"]*"></script>)', r'\1<script src="village-data.js?v='+VERSION+'"></script><script src="resource-layout.js?v='+VERSION+'"></script>', html)
+    html = re.sub(r'(<script src="../realms-evolution\.js[^"]*"></script>)', r'\1<script src="village-data.js?v='+VERSION+'"></script><script src="resource-layout.js?v='+VERSION+'"></script><script src="geography.js?v='+VERSION+'"></script>', html)
     html = re.sub(r'src="../realms-ui\.js[^"]*"', 'src="client.js?v='+VERSION+'"', html)
     html = re.sub(r'src="../homow-options\.js[^"]*"', 'src="options.js?v='+VERSION+'"', html)
     options = (ROOT / 'homow-options.js').read_text().replace("KEY='homow_options_v1'", "KEY='homow_beta_options_v1'").replace("['uk','en','de','pt'].includes(r.locale)", "r.locale==='uk'")
     (HERE / 'options.js').write_text(options)
-    atlas = (ROOT / 'homow-atlas.js').read_text()
+    atlas = (HERE / 'atlas-source.js').read_text()
     footer = "c.restore();c.fillStyle='#152324dc';c.fillRect(0,bh-16,bw,16);c.fillStyle='#f1dfb0';c.font='9px system-ui';c.textAlign='center';c.fillText(dungeon?dungeon.name:cluster.name+' · T'+cluster.tier,bw/2,bh-5);"
-    atlas = replace_once(atlas, footer, 'c.restore();')
+    atlas = atlas.replace(footer, 'c.restore();')
     (HERE / 'atlas.js').write_text(atlas)
     html = re.sub(r'src="../homow-atlas\.js[^"]*"', 'src="atlas.js?v='+VERSION+'"', html)
     html = html.replace('<head>', '<head><script src="asset-paths.js?v='+VERSION+'"></script>')
@@ -38,9 +38,16 @@ def build():
     html = re.sub(r'src="../homow-music\.js[^"]*"', 'src="music.js?v='+VERSION+'"', html)
     html = re.sub(r'src="../release\.js[^"]*"', 'src="release.js?v='+VERSION+'"', html)
     (HERE / 'release.js').write_text("window.BrukRelease=Object.freeze({version:'"+VERSION+"',date:'2026-11-19',name:'3D-бета'});document.querySelectorAll('[data-game-version]').forEach(el=>el.textContent='v"+VERSION+" · БЕТА');document.title='HoMoW · 3D-бета "+VERSION+"';\n")
+    inventory = (ROOT / 'homow-inventory.js').read_text()
+    start = inventory.index('function preview(')
+    end = inventory.index('function change(', start)
+    inventory = inventory[:start] + "function preview(parent,appearance=world.state.appearance){window.HoMoWPortrait(parent,world,appearance); }\n" + inventory[end:]
+    (HERE / 'inventory.js').write_text(inventory)
+    html = re.sub(r'src="../homow-inventory\.js[^"]*"', 'src="inventory.js?v='+VERSION+'"', html)
+    html = html.replace('</head>', '<link rel="stylesheet" href="inventory.css?v='+VERSION+'"></head>')
     html = html.replace('</head>', '<link rel="stylesheet" href="world.css?v='+VERSION+'"></head>')
     html = html.replace('<body>', '<body><aside class="beta-banner">3D-бета '+VERSION+' · Повний світ · Локальна перевірка <a href="../">Основна гра</a></aside>')
-    html = html.replace('<script src="client.js', '<script src="camera3d.js?v='+VERSION+'"></script><script src="scene3d.js?v='+VERSION+'"></script><script src="world.js?v='+VERSION+'"></script><script src="skills.js?v='+VERSION+'"></script><script src="world-style.js?v='+VERSION+'"></script><script src="world-art.js?v='+VERSION+'"></script><script src="creature-art.js?v='+VERSION+'"></script><script src="motion.js?v='+VERSION+'"></script><script src="world-scene.js?v='+VERSION+'"></script><script src="tools.js?v='+VERSION+'"></script><script src="client.js')
+    html = html.replace('<script src="client.js', '<script src="camera3d.js?v='+VERSION+'"></script><script src="scene3d.js?v='+VERSION+'"></script><script src="world.js?v='+VERSION+'"></script><script src="skills.js?v='+VERSION+'"></script><script src="world-style.js?v='+VERSION+'"></script><script src="world-art.js?v='+VERSION+'"></script><script src="creature-art.js?v='+VERSION+'"></script><script src="motion.js?v='+VERSION+'"></script><script src="world-scene.js?v='+VERSION+'"></script><script src="portrait.js?v='+VERSION+'"></script><script src="tools.js?v='+VERSION+'"></script><script src="client.js')
     html = html.replace('Hold Monsters World · HoMoW', 'HoMoW · Повний світ · 3D-бета '+VERSION)
     html = html.replace('пробіл — атака', 'ЛКМ — атака')
     (HERE / 'index.html').write_text(html.rstrip()+'\n')
@@ -78,7 +85,7 @@ def build():
     ui = replace_once(ui, "attack:keys.has('Space')", 'attack:false')
     ui = replace_once(ui, "'Space',", '')
     ui = ui.replace("const running=!(profile.open()", "const running=!(document.querySelector('dialog[open]')||profile.open()")
-    ui = ui.replace("window.BrukRelease.version", "'0.8.0 · бета'")
+    ui = ui.replace("window.BrukRelease.version", "'0.9.0 · бета'")
     ui = ui.replace("})();", "document.querySelectorAll('#gameLocale option:not([value=uk])').forEach(el=>el.remove());document.documentElement.lang='uk';document.querySelector('.homow-download')?.setAttribute('href','../homow.html');})();")
     (HERE / 'client.js').write_text('// Generated by beta/build.py; edit canonical UI or this generator.\n'+ui.rstrip()+'\n')
 
