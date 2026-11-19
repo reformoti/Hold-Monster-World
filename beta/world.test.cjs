@@ -23,7 +23,7 @@ test('canonical full UI boots and renders all clusters with software 3D without 
  for(const h of betaR.HOUSES)assert(betaR.blocked(h.x+h.w/2,h.y+h.h/2),'house collider '+h.owner);
  for(const n of Object.values(betaR.TRADERS)){assert(!betaR.blocked(n.x,n.y,18),'NPC access '+n.name);const path=betaR.findPath(betaR.SPAWN.x,betaR.SPAWN.y,n.x,n.y);assert(path.length&&Math.hypot(path.at(-1).x-n.x,path.at(-1).y-n.y)<65,'route to '+n.name);}
  for(const n of world.nodes.filter(n=>betaR.inVillage(n.x,n.y)))assert(!betaR.blocked(n.x,n.y,15),'resource access '+n.id);
- scene.render(world);const rawDraw=scene.draw.bind(scene);scene.draw=(kind,x,y,z,sx,sy,sz,...args)=>{assert([x,y,z,sx,sy,sz].every(Number.isFinite),'finite '+kind);return rawDraw(kind,x,y,z,sx,sy,sz,...args);};
+ scene.render(world);const cached=scene.cachedFaces;scene.render(world);assert.equal(scene.cachedFaces,cached,'software geometry cache reused');world.nodes[0].charges--;scene.render(world);assert.notEqual(scene.cachedFaces,cached,'resource change invalidates software cache');const rawDraw=scene.draw.bind(scene);scene.draw=(kind,x,y,z,sx,sy,sz,...args)=>{assert([x,y,z,sx,sy,sz].every(Number.isFinite),'finite '+kind);return rawDraw(kind,x,y,z,sx,sy,sz,...args);};
  const modelSignatures=new Set();let geometry=[];const validatedDraw=scene.draw;scene.draw=(...args)=>{geometry.push(args);return validatedDraw(...args);};for(const type of Object.keys(betaR.TYPES)){geometry=[];scene.faces=[];scene.creature({type,x:500,y:500,facing:{x:0,y:1},walking:true,footstep:1,alive:true},1);assert(scene.faces.length>0,type);modelSignatures.add(JSON.stringify(geometry));}assert.equal(modelSignatures.size,Object.keys(betaR.TYPES).length,'distinct rendered mob models');
  for(const type of Object.keys(betaR.NODE_TYPES)){scene.faces=[];scene.resource({id:1,type,x:500,y:500,charges:3},1);assert(scene.faces.length>0,type);}
 
@@ -32,7 +32,7 @@ test('canonical full UI boots and renders all clusters with software 3D without 
  assert(!storage.has('brukivka_realms_v1'));const before=world.state.x;pending.shift()(1000);pending.shift()(4500);assert(storage.has('homow_beta_full_v1'));assert(!storage.has('brukivka_realms_v1'));
 });
 
-test('beta uses Ukrainian even with an old foreign locale, without changing stable preferences',()=>{const O=require('./options.js');assert.equal(O.KEY,'homow_beta_options_v1');for(const locale of ['uk','en','de','pt'])assert.equal(O.normalize({locale}).locale,'uk');const html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');assert(html.includes('src="options.js?v=0.7.0"'));assert(!html.includes('src="../homow-options.js'));});
+test('beta uses Ukrainian even with an old foreign locale, without changing stable preferences',()=>{const O=require('./options.js');assert.equal(O.KEY,'homow_beta_options_v1');for(const locale of ['uk','en','de','pt'])assert.equal(O.normalize({locale}).locale,'uk');const html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');assert(html.includes('src="options.js?v=0.7.1"'));assert(!html.includes('src="../homow-options.js'));});
 
 test('a swing keeps its aim during movement and pointer changes',()=>{const w=new World();w.monsters=[];w.aimTarget={x:w.state.x,y:w.state.y-100};w.attack();const facing={...w.facing};w.aimTarget={x:w.state.x+100,y:w.state.y};w.update(.05,{x:1});assert.deepEqual(w.facing,facing);for(let i=0;i<8;i++)w.update(.05,{x:1});assert(w.facing.x>0);});
 

@@ -41,8 +41,10 @@ class Scene extends window.HoMoWBeta3D.Scene{
  tag(text,x,z,height,hp=1,enemy=false){const i=this.labelCount++;if(!this.labels[i]){const el=document.createElement('div');el.className='scene-label';el.innerHTML='<span></span><i><b></b></i>';this.input.parentElement.append(el);this.labels[i]=el;}const el=this.labels[i],p=this.project(x,z,height);el.hidden=false;el.dataset.side=enemy?'enemy':'player';el.querySelector('span').textContent=text;el.querySelector('i').hidden=hp===null;el.querySelector('b').style.width=Math.max(0,Math.min(1,hp))*100+'%';el.style.left=p.x+'px';el.style.top=p.y+'px';}
  render(w,effects=[]){if(this.lost)return;this.setup(w);this.labelCount=0;this.visible=0;if(this.cpu)this.faces=[];else this.gl.clear(this.gl.COLOR_BUFFER_BIT|this.gl.DEPTH_BUFFER_BIT);
  const cluster=R.clusterOf(w.state),area=R.DUNGEONS.find(d=>'dungeon:'+d.id===cluster)?.arena||R.clusterAt(w.state.x,w.state.y);
- const biome=R.clusterAt(w.state.x,w.state.y).biome;this.draw('cube',area.x+area.w/2,-7,area.y+area.h/2,area.w,10,area.h,({plains:'8dc468',forest:'61a36d',swamp:'71a68b',winter:'c6e3e7'})[biome]);this.villageGround(w);
  const show=o=>R.clusterOf(o)===cluster&&this.visibleAt(o);
+ const staticKey=this.cpu?[this.width,this.height,this.cx,this.cz,this.yaw,this.zoom,this.opt.shadows,this.opt.lowTextures,cluster,w.nodes.map(n=>n.charges).join(',')].join(':'):null;
+ if(this.cpu&&staticKey===this.staticKey){this.faces=this.cachedFaces.slice();this.visible=this.cachedVisible;}else{
+ const biome=R.clusterAt(w.state.x,w.state.y).biome;this.draw('cube',area.x+area.w/2,-7,area.y+area.h/2,area.w,10,area.h,({plains:'8dc468',forest:'61a36d',swamp:'71a68b',winter:'c6e3e7'})[biome]);this.villageGround(w);
  for(const o of R.OBSTACLES){const center={x:o.x+o.w/2,y:o.y+o.h/2};if(R.clusterOf(center)!==cluster||!this.visibleAt(center,Math.max(o.w,o.h)))continue;
   if(o.betaKind)this.prop(o,w.time);
   else if(o.type==='house')this.building(o,w.time);
@@ -50,8 +52,11 @@ class Scene extends window.HoMoWBeta3D.Scene{
   else if(o.type==='wall')this.draw('cube',center.x,23,center.y,o.w,46,o.h,'c1c5ad');
   else this.draw('sphere',center.x,22,center.y,o.w/2,38,o.h/2,'9aafa3');this.visible++;
  }
- for(const n of w.nodes){if(!show(n))continue;this.visible++;this.resource(n,w.time);if(Math.hypot(n.x-w.state.x,n.y-w.state.y)<230)this.tag(R.NODE_TYPES[n.type].name,n.x,n.y,n.type.startsWith('wood')?110:55,n.charges/R.NODE_TYPES[n.type].charges);}
- for(const [id,n]of Object.entries(R.townTraders(w.state))){if(!show(n))continue;this.trader(n,id,w.time);this.tag(n.name,n.x,n.y,120,null);this.visible++;}
+ for(const n of w.nodes){if(!show(n))continue;this.visible++;this.resource(n,w.time);}
+ for(const [id,n]of Object.entries(R.townTraders(w.state))){if(!show(n))continue;this.trader(n,id,w.time);this.visible++;}
+ if(this.cpu){this.staticKey=staticKey;this.cachedFaces=this.faces.slice();this.cachedVisible=this.visible;}}
+ for(const n of w.nodes)if(show(n)&&Math.hypot(n.x-w.state.x,n.y-w.state.y)<230)this.tag(R.NODE_TYPES[n.type].name,n.x,n.y,n.type.startsWith('wood')?110:55,n.charges/R.NODE_TYPES[n.type].charges);
+ for(const n of Object.values(R.townTraders(w.state)))if(show(n))this.tag(n.name,n.x,n.y,120,null);
  for(const [i,n]of R.GUARDS.entries())if(show(n))this.guard(n,w.time,i);
  this.villageLife(w);
  for(const o of R.DECOR){if(!show(o)||['grass','flower','flowers'].includes(o.kind))continue;if(o.kind==='stump')this.treeModel(o.x,o.y,1,1,false,R.clusterAt(o.x,o.y).biome,0);else if(o.kind==='ruin')this.prop({...o,w:30,h:20,betaKind:'ruin'},w.time);else this.draw('sphere',o.x,5,o.y,10,8,9,'acb9a5');}
