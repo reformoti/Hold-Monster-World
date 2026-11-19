@@ -16,8 +16,29 @@ class Scene extends window.HoMoWBeta3D.Scene{
  if(f==='staff'){part(19,38,6,5,68*length,5,'7a6853');part(19,75*length,6,10,15,10,s.weaponVariant?.includes('frost')?'9ed7e6':'e7af72','sphere');}
  }
 
+ trader(n,id,time){
+  // Civilian silhouettes and profession tools, independent of player equipment.
+  const palette={blacksmith:['665040','a58a63'],mage:['615a8e','b5a2cc'],enchanter:['3e7774','9bcfc2'],armorer:['5b6e7b','9cabb0'],alchemist:['526f49','b8c583'],artificer:['876e49','cfb887'],quartermaster:['525e66','c3b698'],market:['945e4b','dec185']};
+  const [cloth,trim]=palette[id]||palette.market,bob=this.opt?.animations===false?0:Math.sin(time*1.8+n.x)*.35;
+  const part=(x,y,z,sx,sy,sz,color,kind='cube')=>this.draw(kind,n.x+x,y+bob,n.y+z,sx,sy,sz,color);
+  if(this.opt?.shadows!==false)part(0,1,0,23,1,15,'53644d','sphere');
+  for(const x of [-7,7]){part(x,17,0,10,25,11,'535346');part(x,5,4,12,9,18,'463f35');}
+  part(0,43,0,29,31,20,cloth);part(0,28,0,31,5,21,'584735');part(0,28,12,6,5,3,trim);
+  for(const x of [-18,18]){part(x,44,0,8,25,10,cloth);part(x,29,3,8,8,9,'c6a17e');}
+  part(0,61,0,10,7,10,'ba9273');part(0,72,0,19,21,18,'d5b28e');
+  for(const x of [-10,10])part(x,71,0,3,6,5,'c6a17e');
+  for(const x of [-5,5]){part(x,74,9.5,3,3,1,'293934');part(x,77,9.5,5,1.4,1,'604b38');}
+  part(0,70,10,3,4,3,'ba9170');part(0,66,9.5,5,1,1,'8e6953');part(0,83,-1,21,5,20,'6b513b');part(0,76,-9,20,13,4,'6b513b');
+  if(['blacksmith','armorer','artificer'].includes(id)){part(0,40,11,22,25,3,'9d7953');part(0,28,12,23,5,3,'805d3e');part(17,34,8,4,23,4,'735b40');part(17,48,8,18,8,9,id==='armorer'?'b9c6c5':'888f89');if(id==='blacksmith')part(0,63,9,15,7,4,'715640');}
+  if(id==='mage'){part(0,21,0,31,22,23,cloth);part(0,86,0,29,3,27,trim);part(0,87,0,13,30,13,cloth,'cone');part(0,62,9,14,11,5,'bcbcb0');part(-22,41,9,5,22,18,'ae8b58');part(-25,41,9,2,18,16,'d7cba3');}
+  if(id==='enchanter'){part(0,52,11,4,12,3,trim);part(18,36,9,10,10,10,'8cdbcf','sphere');part(-19,34,9,5,18,14,'607b84');part(0,86,0,22,4,21,trim);}
+  if(id==='alchemist'){part(0,39,11,21,25,3,'c3b994');part(0,83,0,24,6,23,'d6c7a6');for(const x of [-17,17]){part(x,34,10,7,10,7,x<0?'adc37c':'9bb7d5','sphere');part(x,42,10,3,5,3,'c8b288');}}
+  if(id==='quartermaster'){part(0,84,0,25,6,23,cloth);part(0,87,4,26,2,27,trim);part(-20,37,7,5,21,17,'8e684b');part(-23,37,7,2,17,14,'cbbb98');part(18,35,9,3,16,3,'dfd2ae');}
+  if(id==='market'){part(0,86,0,29,5,26,trim);part(0,91,0,21,8,20,cloth);part(-20,29,10,14,17,12,'ae8e58','sphere');part(-20,39,10,6,4,6,'68583c');for(const x of [13,18,23])part(x,35,8,5,2,5,'dcc67d','sphere');}
+ }
+
  visibleAt(o,padding=150){const p=this.project(o.x,o.y);return p.x>-padding&&p.y>-padding&&p.x<this.width+padding&&p.y<this.height+padding;}
- tag(text,x,z,height,hp=1,enemy=false){const i=this.labelCount++;if(!this.labels[i]){const el=document.createElement('div');el.className='scene-label';el.innerHTML='<span></span><i><b></b></i>';this.input.parentElement.append(el);this.labels[i]=el;}const el=this.labels[i],p=this.project(x,z,height);el.hidden=false;el.dataset.side=enemy?'enemy':'player';el.querySelector('span').textContent=text;el.querySelector('b').style.width=Math.max(0,Math.min(1,hp))*100+'%';el.style.left=p.x+'px';el.style.top=p.y+'px';}
+ tag(text,x,z,height,hp=1,enemy=false){const i=this.labelCount++;if(!this.labels[i]){const el=document.createElement('div');el.className='scene-label';el.innerHTML='<span></span><i><b></b></i>';this.input.parentElement.append(el);this.labels[i]=el;}const el=this.labels[i],p=this.project(x,z,height);el.hidden=false;el.dataset.side=enemy?'enemy':'player';el.querySelector('span').textContent=text;el.querySelector('i').hidden=hp===null;el.querySelector('b').style.width=Math.max(0,Math.min(1,hp))*100+'%';el.style.left=p.x+'px';el.style.top=p.y+'px';}
  render(w,effects=[]){if(this.lost)return;this.setup(w);this.labelCount=0;this.visible=0;if(this.cpu)this.faces=[];else this.gl.clear(this.gl.COLOR_BUFFER_BIT|this.gl.DEPTH_BUFFER_BIT);
  const cluster=R.clusterOf(w.state),area=R.DUNGEONS.find(d=>'dungeon:'+d.id===cluster)?.arena||R.clusterAt(w.state.x,w.state.y);
  this.draw('cube',area.x+area.w/2,-7,area.y+area.h/2,area.w,10,area.h,'6e8063');
@@ -29,7 +50,7 @@ class Scene extends window.HoMoWBeta3D.Scene{
   else this.draw('sphere',center.x,22,center.y,o.w/2,38,o.h/2,'858f81');this.visible++;
  }
  for(const n of w.nodes){if(!show(n))continue;this.visible++;if(n.type==='wood'){if(n.charges)this.tree(n.x,n.y,n.id%3);else this.draw('cube',n.x,8,n.y,15,16,15,'786348');}else if(n.type==='herb'){this.draw('cone',n.x,1,n.y,12,22,12,n.charges?'8eb58a':'6b7056');}else this.draw('sphere',n.x,12,n.y,23,22,19,n.charges?'a3aa93':'646e63');this.tag(R.NODE_TYPES[n.type].name,n.x,n.y,52,n.charges/R.NODE_TYPES[n.type].charges);}
- for(const [id,n]of Object.entries(R.townTraders(w.state))){if(!show(n))continue;this.hero({state:{x:n.x,y:n.y,weaponKind:'staff',armorKind:id==='mage'?'cloth':'leather'},facing:{x:0,y:1},walking:false,footstep:0,time:w.time,swing:0,hurt:0});this.tag(n.name,n.x,n.y,100);this.visible++;}
+ for(const [id,n]of Object.entries(R.townTraders(w.state))){if(!show(n))continue;this.trader(n,id,w.time);this.tag(n.name,n.x,n.y,120,null);this.visible++;}
  for(const n of R.GUARDS){if(show(n)){this.hero({state:{x:n.x,y:n.y},facing:{x:1,y:0},walking:false,footstep:0,time:w.time,swing:0,hurt:0});this.tag(n.name,n.x,n.y,100);}}
  for(const o of R.DECOR){if(!show(o)||['grass','flower','flowers'].includes(o.kind))continue;if(o.kind==='tree')this.tree(o.x,o.y,0);else this.draw('sphere',o.x,7,o.y,15,12,11,'8a9584');}
  if(!w.state.passUnlocked&&this.visibleAt({x:R.PASS.barrierX,y:R.PASS.y+R.PASS.h/2}))this.draw('cube',R.PASS.barrierX,45,R.PASS.y+R.PASS.h/2,20,90,R.PASS.h,'7a8475');
