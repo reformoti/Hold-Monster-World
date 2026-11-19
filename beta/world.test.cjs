@@ -38,7 +38,7 @@ test('canonical full UI boots and renders all clusters with software 3D without 
  assert(!storage.has('brukivka_realms_v1'));const before=world.state.x;pending.shift()(1000);pending.shift()(4500);assert(storage.has('homow_beta_full_v1'));assert(!storage.has('brukivka_realms_v1'));
 });
 
-test('beta uses Ukrainian even with an old foreign locale, without changing stable preferences',()=>{const O=require('./options.js');assert.equal(O.KEY,'homow_beta_options_v1');for(const locale of ['uk','en','de','pt'])assert.equal(O.normalize({locale}).locale,'uk');const html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');assert(html.includes('src="options.js?v=0.9.0"'));assert(!html.includes('src="../homow-options.js'));});
+test('beta uses Ukrainian even with an old foreign locale, without changing stable preferences',()=>{const O=require('./options.js');assert.equal(O.KEY,'homow_beta_options_v1');for(const locale of ['uk','en','de','pt'])assert.equal(O.normalize({locale}).locale,'uk');const html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');assert(html.includes('src="options.js?v=0.9.1"'));assert(!html.includes('src="../homow-options.js'));});
 
 test('a swing keeps its aim during movement and pointer changes',()=>{const w=new World();w.monsters=[];w.aimTarget={x:w.state.x,y:w.state.y-100};w.attack();const facing={...w.facing};w.aimTarget={x:w.state.x+100,y:w.state.y};w.update(.05,{x:1});assert.deepEqual(w.facing,facing);for(let i=0;i<8;i++)w.update(.05,{x:1});assert(w.facing.x>0);});
 

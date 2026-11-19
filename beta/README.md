@@ -53,3 +53,6 @@ npm test
 - Matching bright atlas/minimap palette and visible town district.
 - Responsive inventory panels with a rotatable 3D equipment/appearance preview.
 - All changes are beta-only; stable save and source files stay untouched.
+
+### 0.9.1
+Compact bag cells and a clean portrait pedestal after visual verification.
