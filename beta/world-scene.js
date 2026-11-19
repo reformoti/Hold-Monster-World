@@ -41,18 +41,20 @@ class Scene extends window.HoMoWBeta3D.Scene{
  tag(text,x,z,height,hp=1,enemy=false){const i=this.labelCount++;if(!this.labels[i]){const el=document.createElement('div');el.className='scene-label';el.innerHTML='<span></span><i><b></b></i>';this.input.parentElement.append(el);this.labels[i]=el;}const el=this.labels[i],p=this.project(x,z,height);el.hidden=false;el.dataset.side=enemy?'enemy':'player';el.querySelector('span').textContent=text;el.querySelector('i').hidden=hp===null;el.querySelector('b').style.width=Math.max(0,Math.min(1,hp))*100+'%';el.style.left=p.x+'px';el.style.top=p.y+'px';}
  render(w,effects=[]){if(this.lost)return;this.setup(w);this.labelCount=0;this.visible=0;if(this.cpu)this.faces=[];else this.gl.clear(this.gl.COLOR_BUFFER_BIT|this.gl.DEPTH_BUFFER_BIT);
  const cluster=R.clusterOf(w.state),area=R.DUNGEONS.find(d=>'dungeon:'+d.id===cluster)?.arena||R.clusterAt(w.state.x,w.state.y);
- this.draw('cube',area.x+area.w/2,-7,area.y+area.h/2,area.w,10,area.h,'6e8063');
+ const biome=R.clusterAt(w.state.x,w.state.y).biome;this.draw('cube',area.x+area.w/2,-7,area.y+area.h/2,area.w,10,area.h,({plains:'8dc468',forest:'61a36d',swamp:'71a68b',winter:'c6e3e7'})[biome]);this.villageGround(w);
  const show=o=>R.clusterOf(o)===cluster&&this.visibleAt(o);
  for(const o of R.OBSTACLES){const center={x:o.x+o.w/2,y:o.y+o.h/2};if(R.clusterOf(center)!==cluster||!this.visibleAt(center,Math.max(o.w,o.h)))continue;
-  if(o.type==='house'){this.draw('cube',center.x,40,center.y,o.w,80,o.h,'9b9c7d');this.draw('cone',center.x,80,center.y,o.w*.75,70,o.h*.75,'795d49');this.draw('cube',center.x,24,o.y+o.h+1,24,48,3,'453c30');}
-  else if(o.type==='water')this.draw('cube',center.x,-1,center.y,o.w,1,o.h,'558d92');
-  else if(o.type==='wall')this.draw('cube',center.x,30,center.y,o.w,60,o.h,'929887');
-  else this.draw('sphere',center.x,22,center.y,o.w/2,38,o.h/2,'858f81');this.visible++;
+  if(o.betaKind)this.prop(o,w.time);
+  else if(o.type==='house')this.building(o,w.time);
+  else if(o.type==='water'){this.draw('cube',center.x,-1,center.y,o.w,1,o.h,'54bbce');if(this.opt?.animations!==false)for(let i=0;i<3;i++)this.draw('cube',center.x+Math.sin(w.time*.5+i)*o.w*.18,1,center.y+(i-1)*o.h*.2,o.w*.25,1,2,'b7eeee');}
+  else if(o.type==='wall')this.draw('cube',center.x,23,center.y,o.w,46,o.h,'c1c5ad');
+  else this.draw('sphere',center.x,22,center.y,o.w/2,38,o.h/2,'9aafa3');this.visible++;
  }
- for(const n of w.nodes){if(!show(n))continue;this.visible++;if(n.type==='wood'){if(n.charges)this.tree(n.x,n.y,n.id%3);else this.draw('cube',n.x,8,n.y,15,16,15,'786348');}else if(n.type==='herb'){this.draw('cone',n.x,1,n.y,12,22,12,n.charges?'8eb58a':'6b7056');}else this.draw('sphere',n.x,12,n.y,23,22,19,n.charges?'a3aa93':'646e63');this.tag(R.NODE_TYPES[n.type].name,n.x,n.y,52,n.charges/R.NODE_TYPES[n.type].charges);}
+ for(const n of w.nodes){if(!show(n))continue;this.visible++;this.resource(n,w.time);if(Math.hypot(n.x-w.state.x,n.y-w.state.y)<230)this.tag(R.NODE_TYPES[n.type].name,n.x,n.y,n.type.startsWith('wood')?110:55,n.charges/R.NODE_TYPES[n.type].charges);}
  for(const [id,n]of Object.entries(R.townTraders(w.state))){if(!show(n))continue;this.trader(n,id,w.time);this.tag(n.name,n.x,n.y,120,null);this.visible++;}
- for(const n of R.GUARDS){if(show(n)){this.hero({state:{x:n.x,y:n.y},facing:{x:1,y:0},walking:false,footstep:0,time:w.time,swing:0,hurt:0});this.tag(n.name,n.x,n.y,100);}}
- for(const o of R.DECOR){if(!show(o)||['grass','flower','flowers'].includes(o.kind))continue;if(o.kind==='tree')this.tree(o.x,o.y,0);else this.draw('sphere',o.x,7,o.y,15,12,11,'8a9584');}
+ for(const [i,n]of R.GUARDS.entries())if(show(n))this.guard(n,w.time,i);
+ this.villageLife(w);
+ for(const o of R.DECOR){if(!show(o)||['grass','flower','flowers'].includes(o.kind))continue;if(o.kind==='stump')this.treeModel(o.x,o.y,1,1,false,R.clusterAt(o.x,o.y).biome,0);else if(o.kind==='ruin')this.prop({...o,w:30,h:20,betaKind:'ruin'},w.time);else this.draw('sphere',o.x,5,o.y,10,8,9,'acb9a5');}
  if(!w.state.passUnlocked&&this.visibleAt({x:R.PASS.barrierX,y:R.PASS.y+R.PASS.h/2}))this.draw('cube',R.PASS.barrierX,45,R.PASS.y+R.PASS.h/2,20,90,R.PASS.h,'7a8475');
  const run=w.state.expeditions.run,dungeon=R.DUNGEONS.find(d=>d.id===run?.id);
  if(dungeon){for(const gate of dungeon.gates)if(run.stage<gate.stage)this.draw('cube',gate.x+gate.w/2,35,gate.y+gate.h/2,gate.w,70,gate.h,'899c9e');for(const [p,name]of [[dungeon.chest,'E · Скриня'],[dungeon.exit,'E · Вихід']]){this.draw('cube',p.x,15,p.y,32,30,25,'bba36c');this.tag(name,p.x,p.y,65);}}
@@ -60,7 +62,7 @@ class Scene extends window.HoMoWBeta3D.Scene{
  for(const d of R.DUNGEONS){const p=d.entry;if(p&&show(p)){this.draw('cone',p.x,1,p.y,65,90,60,'566873');this.tag(d.name,p.x,p.y,110);}}
  if(show(R.MONOLITH)){const p=R.MONOLITH;this.draw('cube',p.x,62,p.y,35,124,35,w.state.monolithAwakened?'7fc6ba':'74877b');this.tag('E · Моноліт',p.x,p.y,145);}
  if(show(R.BILLBOARD)){const p=R.BILLBOARD;this.draw('cube',p.x,40,p.y,65,50,10,'9e8b60');this.tag('E · Дошка пошани',p.x,p.y,85);}
- for(const m of w.monsters){if(!m.alive||!show(m))continue;this.monster(m,w.time);const t=R.TYPES[m.type];this.tag(t.name+' · '+(t.level||1),m.x,m.y,t.boss?155:85,m.hp/t.hp,true);this.visible++;}
+ for(const m of w.monsters){if(!m.alive||!show(m))continue;this.creature(m,this.opt?.animations===false?0:w.time);const t=R.TYPES[m.type];this.tag(t.name+' · '+(t.level||1),m.x,m.y,t.boss?155:85,m.hp/t.hp,true);this.visible++;}
  for(const d of w.state.drops){if(show(d))this.draw('cube',d.x,7,d.y,15,14,15,'d2b36f');}
  for(const p of w.projectiles){if(show(p))this.draw('sphere',p.x,28,p.y,p.magic?7:3,p.magic?7:3,9,p.magic?'c8a6e5':'e8d9af');}
  this.hero(w);this.combat({...w,effects:[]});for(const e of effects){if(!this.visibleAt(e))continue;if(e.type==='burst')this.ring(e.x,e.y,e.radius||80,'e0c78e');else if(['hit','damage','heal','gather'].includes(e.type))this.tag(e.type==='gather'?'+'+e.amount:(e.type==='heal'?'+':'')+(e.value||''),e.x,e.y,70+(1-e.life)*45,1,e.type==='damage');}this.tag((w.onlineName||'Мандрівник')+' · '+w.state.level,w.state.x,w.state.y,105,w.state.hp/R.maxHp(w.state));
@@ -69,14 +71,7 @@ class Scene extends window.HoMoWBeta3D.Scene{
  }
  ring(x,y,r,color,inner=0){const count=32;for(let i=0;i<count;i++){const a=i*Math.PI*2/count;this.draw('cube',x+Math.cos(a)*r,2,y+Math.sin(a)*r,6,2,6,color);if(inner)this.draw('cube',x+Math.cos(a)*inner,2,y+Math.sin(a)*inner,5,2,5,color);}}
  warning(t,m){const color=t.life?'958062':'df9478',r=t.radius||60,x=t.x??m.x,y=t.y??m.y,a=t.angle||0;if(['circle','multi','ring'].includes(t.shape)||!t.shape){for(const p of t.points||[{x,y}])this.ring(p.x,p.y,r,color,t.inner||0);}else if(t.shape==='cone'){for(let i=0;i<=24;i++){const q=a-t.arc/2+i*t.arc/24;this.draw('cube',m.x+Math.cos(q)*r,2,m.y+Math.sin(q)*r,7,2,7,color);}}else if(t.shape==='line'){this.draw('cube',m.x+Math.cos(a)*t.range/2,2,m.y+Math.sin(a)*t.range/2,t.range,2,r*2,color,Math.PI/2-a);}else if(t.shape==='cross'){this.draw('cube',x,2,y,t.range*2,2,r*2,color);this.draw('cube',x,2,y,r*2,2,t.range*2,color);}}
- monster(m,time){const t=R.TYPES[m.type],type=t.model||m.type,color=(t.color||'#a3ab8c').replace('#',''),scale=t.boss?1.8:1,r=t.radius;
- if(type==='slime'){this.draw('sphere',m.x,15,m.y,r,18+Math.sin(time*3),r,color);for(const x of [-7,7])this.draw('cube',m.x+x,23,m.y+17,4,4,3,'24382e');}
- else if(['wolf','boar','bear','rat','salamander'].includes(type)){const a=Math.atan2((m.facing?.x||0),(m.facing?.y||1));this.draw('sphere',m.x,25,m.y,r*.8,20,r*1.3,color,a);this.draw('sphere',m.x+(m.facing?.x||0)*25,37,m.y+(m.facing?.y||1)*25,13,14,17,color,a);for(const x of [-12,12])for(const z of [-15,15])this.draw('cube',m.x+x,10+Math.sin((m.footstep||0)+x*z)*2,m.y+z,7,20,7,'5c6659');}
- else if(type==='spider'){this.draw('sphere',m.x,17,m.y,r,16,r,color);for(const side of [-1,1])for(let i=0;i<4;i++)this.draw('cube',m.x+side*(r+7),9,m.y+(i-1.5)*12,25,5,5,color,side*(i-1.5)*.3);}
- else if(['bandit','skeleton','mage'].includes(type)){this.hero({state:{x:m.x,y:m.y},facing:m.facing||{x:0,y:1},walking:m.walking,footstep:m.footstep||0,time,swing:0,hurt:m.hit});}
- else {this.draw('sphere',m.x,35*scale,m.y,r,35*scale,r,color);this.draw('cube',m.x,72*scale,m.y,r,25*scale,r,color);for(const x of [-1,1]){this.draw('cube',m.x+x*r,35*scale,m.y,15,45*scale,18,color);this.draw('cube',m.x+x*12,10,m.y,16,20,20,'626e66');}}
- if(m.telegraph)this.warning(m.telegraph,m);for(const h of m.hazards||[])this.warning(h,m);
- }
 }
+Object.assign(Scene.prototype,window.HoMoWEnvironment,window.HoMoWCreatureArt);
 window.HoMoWFull.Scene=Scene;
 })();

@@ -2,3 +2,5 @@
 .beta-banner{display:flex;align-items:center;justify-content:center;gap:12px;min-height:30px;font-size:11px}.beta-banner button{padding:3px 9px;border:1px solid #847b5a;background:#324837;color:#ead9ae;cursor:pointer;border-radius:3px}#betaTools{max-width:620px}#betaTools>button,.beta-import{display:block;margin:15px 0;padding:10px;border:1px solid #6e7f66;background:#24372c;color:#e5d2a7}.beta-import input{display:block;max-width:100%;margin-top:7px}#worldCanvas{cursor:crosshair}#scene3d{background:#657657}@media(max-width:700px){.beta-banner{font-size:9px;gap:5px}.beta-banner a{margin-left:4px}.beta-banner~.game-top{margin-top:40px}}
 /* The attack is performed only by the left mouse button. Keep the hidden node for canonical HUD updates. */
 #attackAction{display:none!important}
+
+#scene3d{filter:saturate(1.16) brightness(1.06)}.world-frame:after{background:radial-gradient(ellipse at center,transparent 65%,#0e3a1820)}.scene-label>i[hidden]{display:none}.scene-label{font-size:10px;text-shadow:0 1px 3px #173a28}
