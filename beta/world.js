@@ -3,7 +3,7 @@
 'use strict';
 class World extends R.World {
   aimPoint(range){const s=this.state,p=this.aimTarget||{x:s.x+this.facing.x*170,y:s.y+this.facing.y*170},dx=p.x-s.x,dy=p.y-s.y,len=Math.hypot(dx,dy)||1,f=Math.min(1,range/len);return {x:s.x+dx*f,y:s.y+dy*f};}
-  update(dt,input={}){const facing=this.facing,locked=this.swing>0;super.update(dt,input);if(locked&&this.swing>0)this.facing=facing;}
+  update(dt,input={}){const facing=this.facing,locked=this.swing>0,s=this.state,x=s.x,y=s.y,phase=this.footstep;super.update(dt,input);if(locked&&this.swing>0)this.facing=facing;const distance=Math.hypot(s.x-x,s.y-y),teleport=distance>80;this.walking=!teleport&&distance>.005;this.footstep=teleport?0:phase+distance*(s.mounted?.055:.075);this.lastTravel=teleport?0:distance;}
   faceAim(){const s=this.state;if(this.aimTarget){const dx=this.aimTarget.x-s.x,dy=this.aimTarget.y-s.y,len=Math.hypot(dx,dy);if(len>1)this.facing={x:dx/len,y:dy/len};}}
   closest(range){const list=super.closest(range);return this.manualArea?list:list.filter(m=>{const dx=m.x-this.state.x,dy=m.y-this.state.y,len=Math.hypot(dx,dy)||1;return (dx*this.facing.x+dy*this.facing.y)/len>=Math.cos(Math.PI/3);});}
   attack(){

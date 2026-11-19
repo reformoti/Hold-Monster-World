@@ -1,6 +1,14 @@
 /* Beta environment: buildings, collectible plants, geology and village life. */
 (()=>{'use strict';const S=window.HoMoWWorldStyle;
 window.HoMoWEnvironment={
+ horizon(w){const R=window.BrukRealms,s=w.state,cluster=R.clusterOf(s),dungeon=R.DUNGEONS.find(d=>'dungeon:'+d.id===cluster),palette={plains:'8dc468',forest:'61a36d',swamp:'71a68b',winter:'c6e3e7'};
+ this.draw('cube',this.cx,-76,this.cz,6500,10,6500,dungeon?'596777':'72c4d4');
+ if(dungeon){const a=dungeon.arena;for(let x=a.x-80;x<a.x+a.w+80;x+=100)for(const y of [a.y-60,a.y+a.h+60])if(this.visibleAt({x,y},200))this.draw('sphere',x,-18,y,70,42,65,'78848b');for(let y=a.y;y<a.y+a.h;y+=100)for(const x of [a.x-60,a.x+a.w+60])if(this.visibleAt({x,y},200))this.draw('sphere',x,-18,y,65,42,70,'78848b');return;}
+ // Neighbouring terrain stays visible across cluster borders, including at wide zoom.
+ for(const a of R.CLUSTERS)if(a.id!==cluster&&this.visibleAt({x:a.x+a.w/2,y:a.y+a.h/2},Math.max(a.w,a.h)))this.draw('cube',a.x+a.w/2,-8,a.y+a.h/2,a.w,10,a.h,palette[a.biome]);
+ for(const vertical of [false,true]){const length=vertical?R.HEIGHT:R.WIDTH;for(let d=70;d<length;d+=140)for(const far of [false,true]){const x=vertical?(far?R.WIDTH:0):d,y=vertical?d:(far?R.HEIGHT:0);if(!this.visibleAt({x,y},280))continue;this.draw('cube',x,-28,y,vertical?32:144,56,vertical?144:32,'9fa995');const direction=far?1:-1,ox=x+(vertical?direction*85:0),oy=y+(vertical?0:direction*85);this.draw('sphere',ox,-39,oy,vertical?80:65,24+(d%4)*3,vertical?65:80,'8da3aa');this.draw('cube',x+(vertical?-direction*16:0),-1,y+(vertical?0:-direction*16),vertical?30:144,1,vertical?144:30,'ddd2a1');if(Math.floor(d/140)%3===0)this.draw('cone',x+(vertical?direction*380:0),-60,y+(vertical?0:direction*380),115,70+d%130,110,'9cbbc5');}}
+ },
+
  building(o,time){const id=o.owner||'home',x=o.x+o.w/2,z=o.y+o.h/2,w=o.w,d=o.h;
  const palette={blacksmith:['d9b28a','b95638'],mage:['bcb4df','5c69bf'],enchanter:['b6d5c6','398a89'],armorer:['c4c9ba','486c8d'],alchemist:['d9d8a2','498e64'],artificer:['deb67a','b87e3e'],quartermaster:['b5c2bc','6b7792'],market:['e9ce9b','bc6345']},[wall,roof]=palette[id]||palette.market;
  const p=(dx,y,dz,sx,sy,sz,c,k='cube',turn=0)=>this.draw(k,x+dx,y,z+dz,sx,sy,sz,c,turn);

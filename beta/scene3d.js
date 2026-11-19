@@ -37,12 +37,12 @@ class Scene{
  for(let i=0;i<3;i++)this.draw('cube',175+i*12,9,495,10,16,52,'816b49',.35);
  }
  hero(w){
- const s=w.state,a=Math.atan2(w.facing.x,w.facing.y),stride=w.walking?Math.sin(w.footstep):0,bob=w.walking?Math.abs(stride)*1.1:Math.sin(w.time*2)*.35;
+ const s=w.state,a=Math.atan2(w.facing.x,w.facing.y),gait=w.gait??(w.walking?1:0),stride=Math.sin(w.footstep)*gait,bob=Math.abs(stride)*1.4+(1-gait)*Math.sin(w.time*2)*.25;
  const part=(x,y,z,sx,sy,sz,col,turn=a,kind='cube')=>this.draw(kind,s.x+x*Math.cos(a)+z*Math.sin(a),y+bob,s.y-x*Math.sin(a)+z*Math.cos(a),sx,sy,sz,col,turn);
  this.draw('sphere',s.x,1,s.y,26,1,19,'53644d');
  // Layered cloak, fitted cuirass and leather under-armour.
- part(0,43,-12,28,36,4,'315c60');part(0,25,-15-Math.sin(w.footstep)*1.5,30,12,4,'3a6b6b');part(0,20,-16,31,3,4,'b59c67');
- for(const side of [-1,1]){const lift=Math.max(0,stride*side)*5,z=stride*side*4,x=side*8;
+ part(0,43,-12,28,36,4,'315c60');part(0,25,-15-Math.sin(w.footstep)*1.5*gait,30,12,4,'3a6b6b');part(0,20,-16,31,3,4,'b59c67');
+ for(const side of [-1,1]){const lift=Math.max(0,stride*side)*6,z=stride*side*7,x=side*8;
  part(x,23+lift,z,10,19,12,'36454b');part(x,13+lift,z+1,11,14,13,'637b80');part(x,20+lift,z+7,8,7,3,'b6c6c0');part(x,5+lift,z+4,12,8,21,'293c42');part(x,7+lift,z+10,12,4,9,'70878a');}
  part(0,43,0,28,29,19,w.hurt>0?'b17866':s.armorKind==='cloth'?'70608c':s.armorKind==='leather'?'806345':'506b74');part(0,46,9,25,23,4,s.armorKind==='cloth'?'9985b0':s.armorKind==='leather'?'b39265':'91a9aa');part(0,50,12,18,11,2,'bacac3');part(0,39,12,20,4,2,'6b878f');part(0,56,0,26,5,22,'c0cbc1');part(0,30,0,31,5,22,'574936');part(0,30,12,7,7,3,'d5b879');part(9,27,-1,6,10,7,'755e42');
  for(const x of [-18,18]){part(x,54,0,10,7,10,'9bafaf',a,'sphere');part(x,53,2,12,4,14,'b6c4bb');part(x,44,0,8,16,10,'415b63');part(x,36,4,9,11,11,'829ba0');part(x,30,8,8,8,10,'3e4f51');}
