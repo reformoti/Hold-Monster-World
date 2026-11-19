@@ -62,10 +62,10 @@ window.HoMoWEnvironment={
  },
  guard(n,time,index){const sway=this.opt?.animations===false?0:Math.sin(time*.9+index)*.02;this.hero({state:{x:n.x,y:n.y,weaponKind:'spear',armorKind:'plate',supportKind:'shield',appearance:{beard:'none'},outfits:{head:'soldier_helm'}},facing:{x:.9,y:.25+sway},walking:false,footstep:0,time,swing:0,hurt:0});this.draw('cube',n.x,87,n.y,8,17,22,index?'daa844':'3f9dbc');this.draw('cube',n.x-15,48,n.y+15,3,17,14,'4c82a6');this.tag(index?'Вартовий брами':'Капітан варти',n.x,n.y,118,null);},
  villageLife(w){const R=window.BrukRealms;if(!R.inVillage(w.state.x,w.state.y))return;const time=this.opt?.animations===false?0:w.time;
- for(const [i,a]of [[0,{x:535,y:640}],[1,{x:750,y:730}],[2,{x:340,y:340}]]){const p={x:a.x+Math.sin(time*.18+i)*15,y:a.y+Math.cos(time*.18+i)*12};if(!R.blocked(p.x,p.y,20)&&this.visibleAt(p))this.trader(p,['market','alchemist','quartermaster'][i],time);}
+ for(let [i,a]of [[0,{x:535,y:640}],[1,{x:750,y:730}],[2,{x:340,y:340}]]){a=window.HoMoWVillage.spread({...a});const p={x:a.x+Math.sin(time*.18+i)*15,y:a.y+Math.cos(time*.18+i)*12};if(!R.blocked(p.x,p.y,20)&&this.visibleAt(p))this.trader(p,['market','alchemist','quartermaster'][i],time);}
  // Gate towers, hanging banners and an open arch; the existing exit remains free.
- for(const y of [395,610]){const x=950;if(!this.visibleAt({x,y}))continue;this.draw('cube',x,35,y,38,70,38,'b8bdab');this.draw('roof',x,70,y,55,25,55,'478aa8');this.draw('cube',x-23,49,y,3,28,17,'e3bd61');}
- this.draw('cube',950,106,502,25,14,210,'b49662');
+ for(const rawY of [395,610]){const p=window.HoMoWVillage.spread({x:950,y:rawY}),x=p.x,y=p.y;if(!this.visibleAt({x,y:p.y}))continue;this.draw('cube',x,35,y,38,70,38,'b8bdab');this.draw('roof',x,70,y,55,25,55,'478aa8');this.draw('cube',x-23,49,y,3,28,17,'e3bd61');}
+ const gate=R.VILLAGE.gate;this.draw('cube',gate.x,106,gate.y,25,14,252,'b49662');
  }
 };
 function RBiome(p){return window.BrukRealms.clusterAt(p.x,p.y).biome;}

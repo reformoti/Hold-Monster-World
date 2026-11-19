@@ -5,7 +5,7 @@ class Scene extends window.HoMoWBeta3D.Scene{
  constructor(canvas){super(canvas);this.labels.forEach(el=>el.remove());this.damageLabels.forEach(el=>el.remove());this.labels=[];this.damageLabels=[];this.visible=0;this.motion=new window.HoMoWMotion.View();}
  setup(w){this.opt=window.HoMoWOptions.get();const r=this.input.getBoundingClientRect();this.width=r.width;this.height=r.height;this.visual=this.motion.sample(w,performance.now()/1000,R.clusterOf(w.state));const bounds=R.DUNGEONS.find(d=>'dungeon:'+d.id===R.clusterOf(w.state))?.arena||{x:0,y:0,w:R.WIDTH,h:R.HEIGHT},cx=Math.max(bounds.x+100,Math.min(bounds.x+bounds.w-100,this.visual.state.x)),cy=Math.max(bounds.y+100,Math.min(bounds.y+bounds.h-100,this.visual.state.y));this.camera=C.create(this.width,this.height,cx,cy,this.yaw,this.zoom);Object.assign(this,this.camera);const opt=window.HoMoWOptions.get(),dims=window.HoMoWOptions.dimensions(this.width,this.height,opt,devicePixelRatio||1);if(this.canvas.width!==dims.width)this.canvas.width=dims.width;if(this.canvas.height!==dims.height)this.canvas.height=dims.height;if(!this.cpu){const g=this.gl;g.viewport(0,0,this.canvas.width,this.canvas.height);g.uniform4f(this.u.camera,this.spanX,this.spanY,0,0);g.uniform2f(this.u.center,this.cx,this.cz);g.uniform2f(this.u.orbit,this.camera.c,this.camera.s);}}
  draw(kind,x,y,z,...args){if(kind==='sphere'&&args[1]===1&&this.opt?.shadows===false)return;if(kind==='sphere'&&this.opt?.lowTextures)kind='cube';return super.draw(kind,x,y+(this.heroLift||0),z,...args);}
- hero(w){const s=w.state;this.heroLift=0;if(s.mounted){const color=R.MOUNTS[s.selectedMount]?.color?.slice(1)||'a18363',a=Math.atan2(w.facing.x,w.facing.y);this.draw('sphere',s.x,26,s.y,21,23,42,color,a);for(const x of [-15,15])for(const z of [-25,25])this.draw('cube',s.x+x,12,s.y+z,7,24,7,'5b5f50');this.draw('sphere',s.x+w.facing.x*37,52,s.y+w.facing.y*37,13,23,15,color,a);this.heroLift=37;}super.hero({...w,time:this.opt?.animations===false?0:w.time,walking:this.opt?.animations===false?false:w.walking,footstep:this.opt?.animations===false?0:w.footstep,gait:this.opt?.animations===false?0:w.gait,twoHanded:s.weaponVariant?!R.offhandActive(s):false});this.heroLift=0;}
+ hero(w){const s=w.state;this.heroLift=0;if(s.mounted){this.heroLift=this.mountModel(w);}super.hero({...w,time:this.opt?.animations===false?0:w.time,walking:this.opt?.animations===false?false:w.walking,footstep:this.opt?.animations===false?0:w.footstep,gait:this.opt?.animations===false?0:w.gait,twoHanded:s.weaponVariant?!R.offhandActive(s):false});this.heroLift=0;}
  weapon(w,a,bob){const s=w.state,f=s.weaponKind,v=R.VARIANTS[s.weaponVariant],length=v?.reach||1,arc=w.swing>0?Math.sin((1-w.swing/.3)*Math.PI)*1.2:0,turn=a+arc;
  const part=(x,y,z,sx,sy,sz,color,kind='cube')=>this.draw(kind,s.x+x*Math.cos(turn)+z*Math.sin(turn),y+bob,s.y-x*Math.sin(turn)+z*Math.cos(turn),sx,sy,sz,color,turn);
  const metal=s.enchantments?.['variant:'+s.weaponVariant]?'d6c094':'b8cbcb';
@@ -44,9 +44,9 @@ class Scene extends window.HoMoWBeta3D.Scene{
  const show=o=>R.clusterOf(o)===cluster&&this.visibleAt(o);
  const staticKey=this.cpu?[this.width,this.height,this.cx,this.cz,this.yaw,this.zoom,this.opt.shadows,this.opt.lowTextures,cluster,w.nodes.map(n=>n.charges).join(',')].join(':'):null;
  if(this.cpu&&staticKey===this.staticKey){this.faces=this.cachedFaces.slice();this.visible=this.cachedVisible;}else{
- this.horizon(w);
+ this.horizon(w);this.clusterTransition(w);
  const biome=R.clusterAt(w.state.x,w.state.y).biome;this.draw('cube',area.x+area.w/2,-7,area.y+area.h/2,area.w,10,area.h,({plains:'8dc468',forest:'61a36d',swamp:'71a68b',winter:'c6e3e7'})[biome]);this.villageGround(w);this.roads(w);this.frontiers(w);
- for(const o of R.OBSTACLES){const center={x:o.x+o.w/2,y:o.y+o.h/2};if(R.clusterOf(center)!==cluster||!this.visibleAt(center,Math.max(o.w,o.h)))continue;
+ for(const o of R.OBSTACLES){const center={x:o.x+o.w/2,y:o.y+o.h/2};if(!this.visibleAt(center,Math.max(o.w,o.h)))continue;
   if(o.betaKind)this.prop(o,w.time);
   else if(o.type==='house')this.building(o,w.time);
   else if(o.type==='water'){this.draw('cube',center.x,-1,center.y,o.w,1,o.h,'54bbce');if(this.opt?.animations!==false)for(let i=0;i<3;i++)this.draw('cube',center.x+Math.sin(w.time*.5+i)*o.w*.18,1,center.y+(i-1)*o.h*.2,o.w*.25,1,2,'b7eeee');}
@@ -57,27 +57,28 @@ class Scene extends window.HoMoWBeta3D.Scene{
  for(const [id,n]of Object.entries(R.townTraders(w.state))){if(!show(n))continue;this.trader(n,id,w.time);this.visible++;}
  if(this.cpu){this.staticKey=staticKey;this.cachedFaces=this.faces.slice();this.cachedVisible=this.visible;}}
  for(const n of w.nodes)if(show(n)&&Math.hypot(n.x-w.state.x,n.y-w.state.y)<230)this.tag(R.NODE_TYPES[n.type].name,n.x,n.y,n.type.startsWith('wood')?110:55,n.charges/R.NODE_TYPES[n.type].charges);
- for(const n of Object.values(R.townTraders(w.state)))if(show(n))this.tag(n.name,n.x,n.y,120,null);
+ for(const n of Object.values(R.townTraders(w.state)))if(show(n))this.tag(n.name+'\n'+(n.role||''),n.x,n.y,120,null);
  for(const [i,n]of R.GUARDS.entries())if(show(n))this.guard(n,w.time,i);
  this.villageLife(w);
  for(const o of R.DECOR){if(!show(o)||['grass','flower','flowers'].includes(o.kind))continue;if(o.kind==='stump')this.treeModel(o.x,o.y,1,1,false,R.clusterAt(o.x,o.y).biome,0);else if(o.kind==='ruin')this.prop({...o,w:30,h:20,betaKind:'ruin'},w.time);else this.draw('sphere',o.x,5,o.y,10,8,9,'acb9a5');}
  if(!w.state.passUnlocked&&this.visibleAt({x:R.PASS.barrierX,y:R.PASS.y+R.PASS.h/2}))this.draw('cube',R.PASS.barrierX,45,R.PASS.y+R.PASS.h/2,20,90,R.PASS.h,'7a8475');
  const run=w.state.expeditions.run,dungeon=R.DUNGEONS.find(d=>d.id===run?.id);
  if(dungeon){for(const gate of dungeon.gates)if(run.stage<gate.stage)this.draw('cube',gate.x+gate.w/2,35,gate.y+gate.h/2,gate.w,70,gate.h,'899c9e');for(const [p,name]of [[dungeon.chest,'E · Скриня'],[dungeon.exit,'E · Вихід']]){this.draw('cube',p.x,15,p.y,32,30,25,'bba36c');this.tag(name,p.x,p.y,65);}}
- for(const p of R.PORTALS){if(!show(p))continue;for(const side of [-1,1])this.draw('cube',p.x+side*35,40,p.y,14,80,18,'a6b0a0');this.draw('cube',p.x,86,p.y,90,15,18,'cab981');this.tag('E · Перехід',p.x,p.y,115);}
+ for(const p of R.PORTALS){if(!show(p))continue;for(const side of [-1,1])this.draw('cube',p.x+side*35,40,p.y,14,80,18,'a6b0a0');this.draw('cube',p.x,86,p.y,90,15,18,'cab981');const current=R.clusterOf(w.state),to=R.CLUSTERS.find(c=>c.id===(p.a===current?p.b:p.a));this.tag((to?.name||'Перехід')+'\nWASD · пройти / E',p.x,p.y,115,null);}
  for(const d of R.DUNGEONS){const p=d.entry;if(p&&show(p)){this.draw('cone',p.x,1,p.y,65,90,60,'566873');this.tag(d.name,p.x,p.y,110);}}
  if(show(R.MONOLITH)){const p=R.MONOLITH;this.draw('cube',p.x,62,p.y,35,124,35,w.state.monolithAwakened?'7fc6ba':'74877b');this.tag('E · Моноліт',p.x,p.y,145);}
  if(show(R.BILLBOARD)){const p=R.BILLBOARD;this.draw('cube',p.x,40,p.y,65,50,10,'9e8b60');this.tag('E · Дошка пошани',p.x,p.y,85);}
  for(const m of w.monsters){if(!m.alive||!show(m))continue;this.creature(m,this.opt?.animations===false?0:w.time);const t=R.TYPES[m.type];this.tag(t.name+' · '+(t.level||1),m.x,m.y,t.boss?155:85,m.hp/t.hp,true);this.visible++;}
  for(const d of w.state.drops){if(show(d))this.draw('cube',d.x,7,d.y,15,14,15,'d2b36f');}
  for(const p of w.projectiles){if(show(p))this.draw('sphere',p.x,28,p.y,p.magic?7:3,p.magic?7:3,9,p.magic?'c8a6e5':'e8d9af');}
- this.hero({...w,state:this.visual.state,facing:this.visual.facing,gait:this.visual.gait});this.combat({...w,effects:[]});for(const e of effects){if(!this.visibleAt(e))continue;if(e.type==='burst')this.ring(e.x,e.y,e.radius||80,'e0c78e');else if(['hit','damage','heal','gather'].includes(e.type))this.tag(e.type==='gather'?'+'+e.amount:(e.type==='heal'?'+':'')+(e.value||''),e.x,e.y,70+(1-e.life)*45,1,e.type==='damage');}this.tag((w.onlineName||'Мандрівник')+' · '+w.state.level,this.visual.state.x,this.visual.state.y,105,w.state.hp/R.maxHp(w.state));
+ this.hero({...w,state:this.visual.state,facing:this.visual.facing,gait:this.visual.gait});this.combat({...w,effects:[]});for(const e of effects){if(!this.visibleAt(e))continue;if(e.type==='burst')this.ring(e.x,e.y,e.radius||80,'e0c78e');else if(['hit','damage','heal','gather'].includes(e.type))this.tag(e.type==='gather'?'+'+e.amount:(e.type==='heal'?'+':'')+(e.value||''),e.x,e.y,70+(1-e.life)*45,1,e.type==='damage');}this.tag((w.onlineName||'Мандрівник')+' · '+w.state.level,this.visual.state.x,this.visual.state.y,w.state.mounted?155:105,w.state.hp/R.maxHp(w.state));
  for(let i=this.labelCount;i<this.labels.length;i++)this.labels[i].hidden=true;
  if(this.cpu)this.flush();
  }
+ clusterTransition(w){const id=R.clusterOf(w.state);if(this.lastCluster&&id!==this.lastCluster){const name=R.CLUSTERS.find(c=>c.id===id)?.name||'Підземелля';if(!this.transitionLabel){this.transitionLabel=document.createElement('div');this.transitionLabel.className='cluster-transition';this.input.parentElement.append(this.transitionLabel);}this.transitionLabel.textContent=name;this.transitionLabel.classList.remove('show');void this.transitionLabel.offsetWidth;this.transitionLabel.classList.add('show');}this.lastCluster=id;}
  ring(x,y,r,color,inner=0){const count=32;for(let i=0;i<count;i++){const a=i*Math.PI*2/count;this.draw('cube',x+Math.cos(a)*r,2,y+Math.sin(a)*r,6,2,6,color);if(inner)this.draw('cube',x+Math.cos(a)*inner,2,y+Math.sin(a)*inner,5,2,5,color);}}
  warning(t,m){const color=t.life?'958062':'df9478',r=t.radius||60,x=t.x??m.x,y=t.y??m.y,a=t.angle||0;if(['circle','multi','ring'].includes(t.shape)||!t.shape){for(const p of t.points||[{x,y}])this.ring(p.x,p.y,r,color,t.inner||0);}else if(t.shape==='cone'){for(let i=0;i<=24;i++){const q=a-t.arc/2+i*t.arc/24;this.draw('cube',m.x+Math.cos(q)*r,2,m.y+Math.sin(q)*r,7,2,7,color);}}else if(t.shape==='line'){this.draw('cube',m.x+Math.cos(a)*t.range/2,2,m.y+Math.sin(a)*t.range/2,t.range,2,r*2,color,Math.PI/2-a);}else if(t.shape==='cross'){this.draw('cube',x,2,y,t.range*2,2,r*2,color);this.draw('cube',x,2,y,r*2,2,t.range*2,color);}}
 }
-Object.assign(Scene.prototype,window.HoMoWEnvironment,window.HoMoWCreatureArt);
+Object.assign(Scene.prototype,window.HoMoWEnvironment,window.HoMoWCreatureArt,window.HoMoWMountArt);
 window.HoMoWFull.Scene=Scene;
 })();
