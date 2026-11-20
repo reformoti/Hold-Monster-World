@@ -64,3 +64,6 @@ Shared detailed 3D donkey, horse, direwolf and armored horse models in the world
 
 ## 0.11.0 · 2026-11-19
 All resource nodes and overworld monster camps are validated against obstacles, roads, gates, settlement boundaries and each other. Billboard moved to an open village square. Roads now share their exact geometry with both maps. Gate lintels follow the boundary axis and straight approaches. Monster motion checks full body clearance, resource deposits and its own cluster, including charges; old player saves inside a relocated obstacle are moved to a nearby clear point. Expensive layout planning runs in `plan-layout.cjs` during the build; `layout.js` applies its generated data at startup. Stable content, prices and saved ownership are unchanged.
+
+## 0.12.0 · 2026-11-20
+Redesigned progression constellation with path cards, category colors, progress tracks, curved connections and a readable inspector. Branch-focused view isolates its nodes; the toolbar returns to the overview. Talent costs, prerequisites, XP, training and saved progress remain canonical.
