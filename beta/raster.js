@@ -9,18 +9,21 @@ function triangle(frame,face,ia,ib,ic){
  const start=Math.max(0,Math.ceil(Math.min(x,bx,cx)-.5)),end=Math.min(width-1,Math.floor(Math.max(x,bx,cx)-.5));
  const first=Math.max(0,Math.ceil(Math.min(y,by,cy)-.5)),last=Math.min(height-1,Math.floor(Math.max(y,by,cy)-.5));
  if(start>end||first>last)return;
+ const cut=face.cutaway,cx0=cut?cut.screenX*scaleX:0,cy0=cut?cut.screenY*scaleY:0;
+ const cutX=cut?1/(cut.rx*scaleX):0,cutY=cut?1/(cut.ry*scaleY):0;
  const ux=dy2/det,uy=-dx2/det,vx=-dy1/det,vy=dx1/det;
  const db=b.depth-a.depth,dc=c.depth-a.depth;
  const texture=face.material&&S.pixels(face.material),mask=S.tileSize-1,uv=face.uv;
  const ua=texture?uv[ia]:null,ub=texture?uv[ib]:null,uc=texture?uv[ic]:null;
  const rgb=face.rgb,color=0xff000000|(rgb[2]<<16)|(rgb[1]<<8)|rgb[0];
  for(let row=first;row<=last;row++){
-   const dy=row+.5-y,dx=start+.5-x;
+   const dy=row+.5-y,dx=start+.5-x,vertical=(row+.5-cy0)*cutY;
    let u=ux*dx+uy*dy,v=vx*dx+vy*dy,idx=row*width+start;
    for(let col=start;col<=end;col++,idx++,u+=ux,v+=vx){
      if(u<-.000001||v<-.000001||u+v>1.000001)continue;
      const z=a.depth+u*db+v*dc;
      if(z<depth[idx])continue;
+     if(cut&&z>cut.depth+5&&vertical*vertical+((col+.5-cx0)*cutX)**2<1)continue;
      depth[idx]=z;
      if(!texture){pixels[idx]=color;continue;}
      const tx=Math.floor(ua.x+u*(ub.x-ua.x)+v*(uc.x-ua.x))&mask,ty=Math.floor(ua.y+u*(ub.y-ua.y)+v*(uc.y-ua.y))&mask;

@@ -21,12 +21,36 @@ test('canonical full UI boots and renders all clusters with software 3D without 
  const {world,scene}=env.HoMoWBetaRuntime;assert.equal(world.monsters.filter(m=>m.encounterSlot===undefined).length,141);assert.equal(world.nodes.length,190);
  const betaR=env.BrukRealms;
  assert.equal(oreSnapshot.length,world.nodes.length);for(const original of oreSnapshot){const n=world.nodes.find(n=>n.id===original.id);assert.equal(n.type,original.type);assert.equal(betaR.clusterOf(n),betaR.inVillage(n.x,n.y)?'village':original.cluster,'resource keeps region '+n.id);}
+ {
+   const pass=betaR.PASS,entrance=betaR.PORTALS.find(p=>p.x===pass.x&&p.y>pass.y&&p.y<pass.y+pass.h);
+   const fight=new env.HoMoWFull.World({},()=>.5,()=>300000);
+   const boss=fight.monsters.find(m=>m.type==='pass_guardian'),radius=betaR.TYPES[boss.type].radius;
+   assert(boss.x-radius>pass.x&&boss.x+radius<pass.barrierX);
+   assert(boss.y-radius>pass.y&&boss.y+radius<pass.y+pass.h);
+   Object.assign(fight.state,{x:entrance.x-70,y:entrance.y});
+   fight.moveEntity(fight.state,boss.x-68-fight.state.x,boss.y-fight.state.y);
+   assert.equal(betaR.clusterOf(fight.state),betaR.clusterOf(boss));
+   const from={x:fight.state.x,y:fight.state.y};
+   fight.moveEntity(fight.state,500,0);assert(fight.state.x<pass.barrierX);
+   Object.assign(fight.state,from);scene.render(fight);
+   const chest=scene.project(boss.x,boss.y,65),aim=env.HoMoWBodyPick.pick(scene,chest.x,chest.y);
+   assert(Math.hypot(aim.x-boss.x,aim.y-boss.y)<radius,'cursor hits the raised chest');
+   fight.aimTarget=aim;const previous=boss.hp;assert(fight.attack());assert(boss.hp<previous);
+   for(let i=0;i<70;i++)fight.moveEntity(boss,6,0,radius);
+   assert(boss.x+radius<pass.barrierX,'boss stays on the accessible side');
+   const old=fight.save();old.mobState[boss.id]={hp:1,readyAt:0};old.passUnlocked=false;
+   const restored=new env.HoMoWFull.World(old,()=>.5,()=>300000),target=restored.monsters[boss.id];
+   assert.equal(target.hp,1);assert.equal(target.homeX,boss.homeX);
+   restored.aimTarget={x:target.x,y:target.y};assert(restored.attack());assert(!target.alive);
+   assert(restored.state.passUnlocked);restored.moveEntity(restored.state,440,0);assert(restored.state.x>pass.barrierX);
+   const again=new env.HoMoWFull.World(restored.save());assert(again.state.passUnlocked);assert(!again.monsters[boss.id].alive);
+ }
  const ores=world.nodes.filter(n=>betaR.NODE_TYPES[n.type].tool==='pickaxe');for(const n of ores){assert(!betaR.inVillage(n.x,n.y)&&!betaR.inCity(n.x,n.y),'ore outside towns '+n.id);assert(!betaR.blocked(n.x,n.y,30),'ore clear '+n.id);assert(betaR.PORTALS.every(p=>Math.hypot(p.x-n.x,p.y-n.y)>150),'portal access '+n.id);}
 
  const L=env.HoMoWLayout;assert.equal(L.report.nodes,190);assert.equal(L.report.spawns,141);
  assert(!betaR.blocked(betaR.BILLBOARD.x,betaR.BILLBOARD.y,85),'open billboard square');assert(betaR.findPath(betaR.CAMP.x,betaR.CAMP.y,betaR.BILLBOARD.x,betaR.BILLBOARD.y).length,'path to board');
  for(const n of world.nodes){assert(L.free(n,50),'clear resource '+n.id);if(!betaR.clusterOf(n).startsWith('dungeon:'))assert(L.roadFree(n,64),'resource off road '+n.id);assert(L.gateFree(n,180),'resource off gate '+n.id);}
- for(const m of world.monsters.filter(m=>!betaR.clusterOf(m).startsWith('dungeon:'))){const r=betaR.TYPES[m.type].radius;assert(L.free(m,r+20),'clear mob camp '+m.id);assert(!betaR.inVillage(m.x,m.y)&&!betaR.inCity(m.x,m.y));assert(L.gateFree(m,235),'camp off gate '+m.id);assert(world.nodes.every(n=>Math.hypot(n.x-m.x,n.y-m.y)>r+85),'camp off resource '+m.id);}
+ for(const m of world.monsters.filter(m=>!betaR.clusterOf(m).startsWith('dungeon:'))){const r=betaR.TYPES[m.type].radius;assert(L.free(m,r+20),'clear mob camp '+m.id);assert(!betaR.inVillage(m.x,m.y)&&!betaR.inCity(m.x,m.y));if(m.type!=='pass_guardian')assert(L.gateFree(m,235),'camp off gate '+m.id);assert(world.nodes.every(n=>Math.hypot(n.x-m.x,n.y-m.y)>r+85),'camp off resource '+m.id);}
  for(const region of env.HoMoWEncounterSites){
    const locals=new Set(betaR.SPAWNS.filter(([type,x,y])=>betaR.clusterOf({x,y})===region.cluster&&!betaR.TYPES[type].boss&&!betaR.TYPES[type].elite).map(s=>s[0]));
    assert(region.types.every(t=>locals.has(t)));
@@ -220,4 +244,20 @@ test('overlapping armor facets resolve per pixel in either draw order',()=>{
  const pixel=(x,y)=>Array.from(ctx.output.slice((y*8+x)*4,(y*8+x)*4+4));
  env.HoMoWRaster.flush(view,true);assert.deepEqual(pixel(1,1),[210,185,80,255]);assert.deepEqual(pixel(5,1),[240,20,15,255]);
  view.faces.reverse();env.HoMoWRaster.flush(view,true);assert.deepEqual(pixel(1,1),[210,185,80,255]);assert.deepEqual(pixel(5,1),[240,20,15,255]);
+});
+
+test('tree models retain their species, scale, and a matching harvested stump',()=>{
+ const env={};env.window=env;vm.createContext(env);
+ for(const file of ['faceted-meshes','world-style','world-scale','tree-art'])vm.runInContext(fs.readFileSync(path.join(__dirname,file+'.js'),'utf8'),env);
+ const bounds=(tree,alive)=>{
+   let top=0,minX=Infinity,maxX=-Infinity;
+   env.HoMoWTrees.draw.call({draw(mesh,x,y,z,sx,sy,sz){
+     const data=env.HoMoWForms.meshes.get(mesh);
+     for(let i=0;i<data.length;i+=6){const px=x+sx*data[i];top=Math.max(top,y+sy*data[i+1]);minX=Math.min(minX,px);maxX=Math.max(maxX,px);}
+   }},0,0,2,tree,alive,'forest',619);
+   return {top,width:maxX-minX};
+ };
+ const trees=Array.from({length:6},(_,i)=>bounds(i,true));
+ assert(trees.every(b=>b.top>5*32&&b.top<22*32));assert(trees[1].width/trees[1].top>trees[2].width/trees[2].top*1.3);
+ for(let i=0;i<trees.length;i++)assert(bounds(i,false).top<trees[i].top*.04);
 });

@@ -80,7 +80,7 @@ class World extends R.World {
     }
     return saved;
   }
-  moveEntity(entity,dx,dy,r){const L=typeof window!=='undefined'?window.HoMoWLayout:null;if(entity===this.state||!entity.type||!L)return super.moveEntity(entity,dx,dy,r);const radius=R.TYPES[entity.type].radius,cluster=R.clusterOf({x:entity.homeX,y:entity.homeY}),valid=p=>R.clusterOf(p)===cluster&&!R.inVillage(p.x,p.y)&&!R.inCity(p.x,p.y)&&L.free(p,radius+3)&&L.gateFree(p,125)&&this.nodes.every(n=>Math.hypot(n.x-p.x,n.y-p.y)>radius+32);
+  moveEntity(entity,dx,dy,r){const L=typeof window!=='undefined'?window.HoMoWLayout:null;if(entity===this.state||!entity.type||!L)return super.moveEntity(entity,dx,dy,r);const radius=R.TYPES[entity.type].radius,cluster=R.clusterOf({x:entity.homeX,y:entity.homeY}),valid=p=>R.clusterOf(p)===cluster&&!R.inVillage(p.x,p.y)&&!R.inCity(p.x,p.y)&&L.free(p,radius+3)&&(entity.type==='pass_guardian'?p.x>R.PASS.x+radius&&p.x+radius<R.PASS.barrierX&&p.y>R.PASS.y+radius&&p.y<R.PASS.y+R.PASS.h-radius:L.gateFree(p,125))&&this.nodes.every(n=>Math.hypot(n.x-p.x,n.y-p.y)>radius+32);
  const len=Math.hypot(dx,dy);if(!len)return;const clear=(vx,vy)=>{const count=Math.max(1,Math.ceil(Math.hypot(vx,vy)/10));for(let i=1;i<=count;i++)if(!valid({x:entity.x+vx*i/count,y:entity.y+vy*i/count}))return false;return true;};
  for(const turn of [0,.45,-.45,.9,-.9,1.35,-1.35]){const x=dx*Math.cos(turn)-dy*Math.sin(turn),y=dx*Math.sin(turn)+dy*Math.cos(turn);if(clear(x,y)){super.moveEntity(entity,x,y,radius);return;}}entity.walking=false;
  }
