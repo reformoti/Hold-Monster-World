@@ -27,7 +27,13 @@ const valid=p=>free(p,radius+24)&&gateFree(p,185)&&(!dungeon?roadFree(p,65):true
 const p=search(origin,'node'+n.id,valid,90);Object.assign(n,p);placed.push(n);if(Math.hypot(origin.x-n.x,origin.y-n.y)>1)nodesMoved++;}
 // Each monster gets an unobstructed camp in its own original cluster, apart from deposits.
 const camps=[];let mobsMoved=0;for(const [id,s]of D.SPAWNS.entries()){const origin={x:s[1],y:s[2]},dungeon=R.clusterOf(origin).startsWith('dungeon:'),r=R.TYPES[s[0]].radius;
-if(dungeon)continue;const p=search(origin,'mob'+id,p=>free(p,r+35)&&inside(p,areaOf(p),115)&&gateFree(p,240)&&roadFree(p,85)&&!R.inVillage(p.x,p.y)&&!R.inCity(p.x,p.y)&&D.NODES.every(n=>Math.hypot(n.x-p.x,n.y-p.y)>r+90)&&camps.every(q=>Math.hypot(q.x-p.x,q.y-p.y)>110),110);s[1]=p.x;s[2]=p.y;camps.push(p);if(Math.hypot(origin.x-p.x,origin.y-p.y)>1)mobsMoved++;}
+if(dungeon)continue;
+if(s[0]==='pass_guardian'){
+  // This encounter unlocks the barrier. Its authored camp belongs on the approach road.
+  if(!free(origin,r+20)||R.personalBlocked({passUnlocked:false},origin.x,origin.y,r))throw Error('Blocked pass guardian camp');
+  camps.push(origin);continue;
+}
+const p=search(origin,'mob'+id,p=>free(p,r+35)&&inside(p,areaOf(p),115)&&gateFree(p,240)&&roadFree(p,85)&&!R.inVillage(p.x,p.y)&&!R.inCity(p.x,p.y)&&D.NODES.every(n=>Math.hypot(n.x-p.x,n.y-p.y)>r+90)&&camps.every(q=>Math.hypot(q.x-p.x,q.y-p.y)>110),110);s[1]=p.x;s[2]=p.y;camps.push(p);if(Math.hypot(origin.x-p.x,origin.y-p.y)>1)mobsMoved++;}
 // Remove visual clutter from the protected approaches as well.
 for(let i=R.DECOR.length-1;i>=0;i--)if(reserved(R.DECOR[i])||!roadFree(R.DECOR[i],45))R.DECOR.splice(i,1);
 window.HoMoWLayout={free,roadFree,gateFree,borderFree,distance,segments,report:{obstacles:R.OBSTACLES.length,nodes:D.NODES.length,spawns:D.SPAWNS.length,nodesMoved,mobsMoved}};

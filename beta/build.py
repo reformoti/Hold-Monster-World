@@ -4,7 +4,7 @@ import re
 import subprocess
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
-VERSION = '0.15.0'
+VERSION = '0.16.0'
 
 def replace_once(text, old, new):
     if text.count(old) != 1:
@@ -61,7 +61,7 @@ def build():
     html = replace_once(html, '<canvas id="worldMap"', '<p id="encounterStatus" class="encounter-status" role="timer"></p><canvas id="worldMap"')
     html = html.replace('<body>', '<body><aside class="beta-banner">3D-бета '+VERSION+' · Повний світ · Локальна перевірка <a href="../">Основна гра</a></aside>')
     html = re.sub(r'(<script src="../realms-core\.js[^"]*"></script>)', r'\1<script src="layout.js?v='+VERSION+'"></script>', html)
-    html = html.replace('<script src="client.js', '<script src="camera3d.js?v='+VERSION+'"></script><script src="materials.js?v='+VERSION+'"></script><script src="raster.js?v='+VERSION+'"></script><script src="faceted-meshes.js?v='+VERSION+'"></script><script src="armory.js?v='+VERSION+'"></script><script src="armory-icons.js?v='+VERSION+'"></script><script src="avatar.js?v='+VERSION+'"></script><script src="scene3d.js?v='+VERSION+'"></script><script src="encounter-sites.js?v='+VERSION+'"></script><script src="world.js?v='+VERSION+'"></script><script src="skills.js?v='+VERSION+'"></script><script src="world-style.js?v='+VERSION+'"></script><script src="world-art.js?v='+VERSION+'"></script><script src="creature-art.js?v='+VERSION+'"></script><script src="motion.js?v='+VERSION+'"></script><script src="mount-art.js?v='+VERSION+'"></script><script src="world-scene.js?v='+VERSION+'"></script><script src="portrait.js?v='+VERSION+'"></script><script src="tools.js?v='+VERSION+'"></script><script src="client.js')
+    html = html.replace('<script src="client.js', '<script src="camera3d.js?v='+VERSION+'"></script><script src="materials.js?v='+VERSION+'"></script><script src="raster.js?v='+VERSION+'"></script><script src="faceted-meshes.js?v='+VERSION+'"></script><script src="world-scale.js?v='+VERSION+'"></script><script src="tree-art.js?v='+VERSION+'"></script><script src="body-pick.js?v='+VERSION+'"></script><script src="armory.js?v='+VERSION+'"></script><script src="armory-icons.js?v='+VERSION+'"></script><script src="avatar.js?v='+VERSION+'"></script><script src="scene3d.js?v='+VERSION+'"></script><script src="encounter-sites.js?v='+VERSION+'"></script><script src="world.js?v='+VERSION+'"></script><script src="skills.js?v='+VERSION+'"></script><script src="world-style.js?v='+VERSION+'"></script><script src="world-art.js?v='+VERSION+'"></script><script src="creature-art.js?v='+VERSION+'"></script><script src="motion.js?v='+VERSION+'"></script><script src="mount-art.js?v='+VERSION+'"></script><script src="world-scene.js?v='+VERSION+'"></script><script src="portrait.js?v='+VERSION+'"></script><script src="tools.js?v='+VERSION+'"></script><script src="client.js')
     html = html.replace('Hold Monsters World · HoMoW', 'HoMoW · Повний світ · 3D-бета '+VERSION)
     html = html.replace('пробіл — атака', 'ЛКМ — атака')
     (HERE / 'index.html').write_text(html.rstrip()+'\n')
@@ -71,7 +71,7 @@ def build():
     ui = ui.replace("const raw=localStorage.getItem(KEY);", "const raw=localStorage.getItem(KEY)||localStorage.getItem('brukivka_realms_v1');")
     ui = ui.replace("if(raw&&saved.schema!==2&&!localStorage.getItem('brukivka_realms_backup_v1'))localStorage.setItem('brukivka_realms_backup_v1',raw);", '')
     ui = replace_once(ui, 'const world=new R.World(saved);', 'const world=new window.HoMoWFull.World(saved);')
-    ui = replace_once(ui, "  function screenToWorld(event){"+ui.split('  function screenToWorld(event){')[1].split('\n')[0], '  function screenToWorld(event){const r=canvas.getBoundingClientRect();return scene.pick(event.clientX-r.left,event.clientY-r.top);}')
+    ui = replace_once(ui, "  function screenToWorld(event){"+ui.split('  function screenToWorld(event){')[1].split('\n')[0], '  function screenToWorld(event){const r=canvas.getBoundingClientRect();return window.HoMoWBodyPick.pick(scene,event.clientX-r.left,event.clientY-r.top);}')
     start = ui.index('  function draw(dt){')
     end = ui.index('  function minimap()', start)
     ui = ui[:start] + '''  const scene=new window.HoMoWFull.Scene(canvas);

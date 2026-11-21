@@ -186,17 +186,18 @@ function draw(view,w){
  const palette={skin:({light:'e5b8a2',warm:'d6a18a',bronze:'ab7960',dark:'77503e'})[look.skin]||'dcb197',hair:pick('hair',look.hair,'#513b32'),accent:pick('accent',look.accent,'#77826e'),
    ivory:w.hurt>0?'d99f92':'f0e5cf',linen:'fff1d9',gold:'d7ae6b',darkMetal:'494855',visor:'272633',under:'383941',trouser:'4d4853',boot:'58473e',
    robe:'796d87',binding:'745641',leather:'a77b55',sclera:'f8e8ce',eye:'34342f',lip:'875f50',flame:'f4bc73',page:'eadcc3'};
- const at=([x,y,z])=>[s.x+x*cs+z*sn,y+bob,s.y-x*sn+z*cs];
+ const unit=window.HoMoWScale.human;
+ const at=([x,y,z])=>[s.x+(x*cs+z*sn)*unit,(y+bob)*unit,s.y+(-x*sn+z*cs)*unit];
  const place=(parts,offset,scale=[1,1,1],turn=0,pitch=0,lean=0,colors=palette)=>{
    const [x,y,z]=at(offset);
-   for(const {mesh,slot} of parts)view.draw(mesh,x,y,z,...scale,colors[slot],yaw+turn,null,pitch,lean);
+   for(const {mesh,slot} of parts)view.draw(mesh,x,y,z,scale[0]*unit,scale[1]*unit,scale[2]*unit,colors[slot],yaw+turn,null,pitch,lean);
  };
  const figure=(name,make,p,scale,turn,pitch,lean)=>place(solid(name,make),p,scale,turn,pitch,lean);
  const limb=(name,make,low,high)=>{
    const dx=high[0]-low[0],dy=high[1]-low[1],dz=high[2]-low[2],l=Math.hypot(dx,dy,dz);
    figure(name,make,low,[1,l,1],0,Math.atan2(dz,dy),Math.asin(dx/l));
  };
- if(!s.mounted&&view.opt?.shadows!==false)view.draw('orb',s.x,.2,s.y,21,1.0,13.5,'5a614e');
+ if(!s.mounted&&view.opt?.shadows!==false)view.draw('orb',s.x,.2,s.y,21*unit,1,13.5*unit,'5a614e');
  const torsoKey='torso/'+kind;
  figure(torsoKey,b=>torso(b,kind),[0,0,0],[width,1,1]);
  const headgear=bare?'':out.head||'',headKey=['head',headgear,look.style||'short',look.beard||'none'].join('/');
@@ -212,7 +213,7 @@ function draw(view,w){
  const feet=bare?'':out.feet||'';
  for(const d of [-1,1]){
    const stride=step*d,shift=s.mounted?3.5:0,x=d*(6.75*width+shift),z=d*1.8+stride*6,up=Math.max(0,stride)*4;
-   const foot=[x+d*1.2,up,z],ankle=[foot[0],up+5.2,z-.65],knee=[x+.2*d,18.4+up*.48,z*.52+2.2],hip=[d*6.8*width,30.6,-.55];
+   const foot=s.mounted?[d*19,4.5,-3]:[x+d*1.2,up,z],ankle=[foot[0],foot[1]+5.2,foot[2]-.65],knee=s.mounted?[d*20,20,9]:[x+.2*d,18.4+up*.48,z*.52+2.2],hip=[d*6.8*width,30.6,-.55];
    const key='leg/'+kind+'/'+feet+'/';
    limb(key+'thigh',b=>leg(b,kind,'thigh',feet),knee,hip);
    limb(key+'shin',b=>leg(b,kind,'shin',feet),ankle,knee);
@@ -222,7 +223,7 @@ function draw(view,w){
  const paired=['sword_dual','daggers_pair','daggers_claws'].includes(id);
  const two=!bare&&!!w.twoHanded,progress=w.swing>0?Math.min(1,Math.max(0,1-w.swing/.25)):0,strike=Math.sin(progress*Math.PI);
  const model=window.HoMoWArmory.get(id,s.variantArsenal?.[id]??s.arsenal?.[family]??0);
- const weaponScale=1.0;
+ const weaponScale=window.HoMoWScale.weapon[id]||1,heldUnit=weaponScale*unit;
  let pitch=(family==='spear'?.46:family==='sword'?.25:family==='daggers'?.40:.15)+strike*(family==='staff'?.35:.96);
  let lean=(family==='spear'?.33:family==='staff'?.25:.49)+(two?.12:0);
  let turn=(family==='bow'?0:.10)+Math.sin(progress*2*Math.PI)*(family==='axe'?.98:.51);
@@ -269,7 +270,7 @@ function draw(view,w){
    const axis=F.basis(turn*mirror,pitch,lean*mirror),[x,y,z]=at(hand);
    for(const {mesh,slot} of model.parts){
      const material=slot==='wood'?'wood':slot==='grip'?'leather':slot==='gem'?'rune':null;
-     view.draw(mesh,x,y,z,mirror*weaponScale,weaponScale,weaponScale,model.colors[slot],yaw+turn*mirror,material,pitch,lean*mirror);
+     view.draw(mesh,x,y,z,mirror*heldUnit,heldUnit,heldUnit,model.colors[slot],yaw+turn*mirror,material,pitch,lean*mirror);
    }
    if(enchant){
      const socket=model.tip;
@@ -277,8 +278,8 @@ function draw(view,w){
        const pos=at(transformed(hand,axis,[socket[0]+dx*.74,socket[1]+(dz-9)*.77,socket[2]+dy*.68],mirror));
        if(shape==='cube'){
          const d=F.point(axis,Math.sin(twist)*.74*mirror,Math.cos(twist)*.77,0),length=Math.hypot(...d);
-         view.draw(shape,...pos,sx*.77,sy*.77,sz*length,ink,yaw+Math.atan2(d[0],d[2]),null,-Math.asin(d[1]/length),0);
-       }else view.draw(shape,...pos,sx*.82,sy*.82,sz*.82,ink,yaw+turn*mirror,null,pitch,lean*mirror);
+         view.draw(shape,...pos,sx*.77*heldUnit,sy*.77*heldUnit,sz*length*heldUnit,ink,yaw+Math.atan2(d[0],d[2]),null,-Math.asin(d[1]/length),0);
+       }else view.draw(shape,...pos,sx*.82*heldUnit,sy*.82*heldUnit,sz*.82*heldUnit,ink,yaw+turn*mirror,null,pitch,lean*mirror);
      });
    }
  }

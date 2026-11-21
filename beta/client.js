@@ -70,7 +70,7 @@
   for(const object of staticObjects)object.draw=()=>staticCacheIDs.has(object.id)?staticSprite(object):object.render(ctx);
   const playerRecord={x:0,y:0,draw:player};
   function renderRecord(object,type){let record=renderRecords.get(object);if(!record){record={draw:()=>{if(type==='monster')monster(object);else if(type==='node')A.drawNode(ctx,object,world);else M.drop(ctx,object);}};renderRecords.set(object,record);}record.x=object.x;record.y=object.y;return record;}
-  function screenToWorld(event){const r=canvas.getBoundingClientRect();return scene.pick(event.clientX-r.left,event.clientY-r.top);}
+  function screenToWorld(event){const r=canvas.getBoundingClientRect();return window.HoMoWBodyPick.pick(scene,event.clientX-r.left,event.clientY-r.top);}
   const scene=new window.HoMoWFull.Scene(canvas);
   window.HoMoWBetaRuntime={world,scene,save:()=>save()};
   let loadingImportedSave=false;

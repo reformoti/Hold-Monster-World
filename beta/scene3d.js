@@ -2,19 +2,20 @@
 (()=>{'use strict';
 const surfaces=window.HoMoWMaterials;
 const vertex=`attribute vec3 p,n;uniform vec3 pos,size;uniform mat3 rotation;uniform vec4 camera;uniform vec2 center,orbit;varying float light;
-varying vec2 surfaceUV;
+varying vec2 surfaceUV; varying vec3 sight;
+uniform vec4 focus;
 void main(){vec3 q=p*size;
 vec3 face=abs(n);
 if(face.y>=max(face.x,face.z)) surfaceUV=size.x>size.z?q.zx:q.xz;
 else if(face.x>=face.z) surfaceUV=size.y>size.z?q.zy:q.yz;
 else surfaceUV=size.x>size.y?q.yx:q.xy;
 surfaceUV/=${surfaces.units.toFixed(1)};
-vec3 v=rotation*q+pos;vec3 normal=normalize(rotation*(n/size));light=.67+.33*max(0.,dot(normal,normalize(vec3(-.5,1.,.6))));float dx=v.x-center.x,dz=v.z-center.y;float x=dx*orbit.x-dz*orbit.y,z=dx*orbit.y+dz*orbit.x;gl_Position=vec4(x/camera.x,(-z*.6+v.y*.8)/camera.y,-(z*.8+v.y*.6)/1800.,1.);}`;
+vec3 v=rotation*q+pos;vec3 normal=normalize(rotation*(n/size));light=.67+.33*max(0.,dot(normal,normalize(vec3(-.5,1.,.6))));float dx=v.x-center.x,dz=v.z-center.y;float x=dx*orbit.x-dz*orbit.y,z=dx*orbit.y+dz*orbit.x;vec3 delta=v-focus.xyz;float fz=dot(delta.xz,orbit.yx);sight=vec3((delta.x*orbit.x-delta.z*orbit.y)/34.,(delta.y*.8-fz*.6)/43.,fz*.8+delta.y*.6);gl_Position=vec4(x/camera.x,(-z*.6+v.y*.8)/camera.y,-(z*.8+v.y*.6)/1800.,1.);}`;
 const fragment=`precision mediump float;uniform vec3 color;varying float light;
-varying vec2 surfaceUV;
+varying vec2 surfaceUV; varying vec3 sight;
 uniform sampler2D surface;
-uniform bool textured;
-void main(){float detail=textured?texture2D(surface,surfaceUV).r:1.;gl_FragColor=vec4(color*light*detail,1.);}`;
+uniform bool textured,covered;
+void main(){if(covered&&sight.z>5.&&dot(sight.xy,sight.xy)<1.)discard;float detail=textured?texture2D(surface,surfaceUV).r:1.;gl_FragColor=vec4(color*light*detail,1.);}`;
 const runeColors=['','86df99','76cddd','76a5ff','ae91ff','eb8ad7','ff9973','ffce68','fff2b8'];
 // Effect coordinates are local to the weapon socket, including during a swing.
 function enchantEffect(level,time,emit){
@@ -77,7 +78,7 @@ const triangleVertices=[0,6,12],quadVertices=[0,6,12,30];
 class Scene{
  constructor(input){this.yaw=-.48;this.zoom=1.08;this.colorCache=new Map();this.input=input;this.canvas=document.createElement('canvas');this.canvas.id='scene3d';this.canvas.setAttribute('aria-hidden','true');input.after(this.canvas);const g=this.gl=this.canvas.getContext('webgl',{antialias:true,alpha:false});this.cpu=!g;if(this.cpu)this.ctx=this.canvas.getContext('2d');
  if(g){
- const shader=(type,src)=>{const s=g.createShader(type);g.shaderSource(s,src);g.compileShader(s);if(!g.getShaderParameter(s,g.COMPILE_STATUS))throw Error(g.getShaderInfoLog(s));return s;};const program=this.program=g.createProgram();g.attachShader(program,shader(g.VERTEX_SHADER,vertex));g.attachShader(program,shader(g.FRAGMENT_SHADER,fragment));g.linkProgram(program);if(!g.getProgramParameter(program,g.LINK_STATUS))throw Error('WebGL link failed');g.useProgram(program);this.u={};for(const key of ['pos','size','rotation','camera','center','orbit','color','surface','textured'])this.u[key]=g.getUniformLocation(program,key);this.attributes=[g.getAttribLocation(program,'p'),g.getAttribLocation(program,'n')];this.meshes={};for(const key of ['cube','cone','sphere','orb','blade','roof']){const data=meshData(key),buffer=g.createBuffer();g.bindBuffer(g.ARRAY_BUFFER,buffer);g.bufferData(g.ARRAY_BUFFER,data,g.STATIC_DRAW);this.meshes[key]={buffer,count:data.length/6};}this.surfaceTextures=new Map([['steel',surfaces.texture(g,'steel')]]);
+ const shader=(type,src)=>{const s=g.createShader(type);g.shaderSource(s,src);g.compileShader(s);if(!g.getShaderParameter(s,g.COMPILE_STATUS))throw Error(g.getShaderInfoLog(s));return s;};const program=this.program=g.createProgram();g.attachShader(program,shader(g.VERTEX_SHADER,vertex));g.attachShader(program,shader(g.FRAGMENT_SHADER,fragment));g.linkProgram(program);if(!g.getProgramParameter(program,g.LINK_STATUS))throw Error('WebGL link failed');g.useProgram(program);this.u={};for(const key of ['pos','size','rotation','focus','covered','camera','center','orbit','color','surface','textured'])this.u[key]=g.getUniformLocation(program,key);this.attributes=[g.getAttribLocation(program,'p'),g.getAttribLocation(program,'n')];this.meshes={};for(const key of ['cube','cone','sphere','orb','blade','roof']){const data=meshData(key),buffer=g.createBuffer();g.bindBuffer(g.ARRAY_BUFFER,buffer);g.bufferData(g.ARRAY_BUFFER,data,g.STATIC_DRAW);this.meshes[key]={buffer,count:data.length/6};}this.surfaceTextures=new Map([['steel',surfaces.texture(g,'steel')]]);
  g.uniform1i(this.u.surface,0);this.activeMaterial=null;g.enable(g.DEPTH_TEST);g.clearColor(.39,.46,.34,1);}else{this.meshes={};for(const key of ['cube','cone','sphere','orb','blade','roof'])this.meshes[key]={data:meshData(key)};}this.labels=[];for(const text of ['Мандрівник · 1','Лісовий слиз','Дикий вовк']){const el=document.createElement('div');el.className='scene-label';el.innerHTML='<span></span><i><b></b></i>';el.dataset.side=this.labels.length?'enemy':'player';el.querySelector('span').textContent=text;input.parentElement.append(el);this.labels.push(el);}this.damageLabels=[];for(let i=0;i<12;i++){const el=document.createElement('div');el.className='damage-number';input.parentElement.append(el);this.damageLabels.push(el);}input.style.opacity='0';this.canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();this.lost=true;(document.getElementById('worldNotice')||document.getElementById('notice')||{}).textContent='3D-контекст втрачено. Онови сторінку.';});
  }
  rotate(delta){this.yaw=(this.yaw+delta)%(Math.PI*2);}
@@ -101,7 +102,11 @@ class Scene{
      this.lastYaw=turn;this.lastPitch=pitch;this.lastLean=lean;
      if(!this.cpu)this.gl.uniformMatrix3fv(this.u.rotation,false,this.rotation);
    }
-   const m=this.rotation;
+   const m=this.rotation,covered=!!(this.cutaway&&(this.cover||kind.startsWith('tree/')));
+   if(!this.cpu&&this.gpuCover!==covered){
+     this.gl.uniform1i(this.u.covered,covered?1:0);this.gpuCover=covered;
+     if(covered){const f=this.cutaway;this.gl.uniform4f(this.u.focus,f.x,f.y,f.z,1);}
+   }
    if(this.cpu){
      const data=mesh.data,rgb=this.rgb(color);
      const vertices=kind==='cube'?quadVertices:triangleVertices;
@@ -126,6 +131,7 @@ class Scene{
        const light=.67+.33*Math.max(0,(-nx*.5+ny+nz*.6)/1.269);
        const shaded=rgb.map(v=>Math.round(v*light));
        const face={pts,rgb:shaded,layer:kind.startsWith('land/meadow/')?-1.8:kind.startsWith('land/pond/')?-1.3:sx>2000?-3:sx>800?-2:sy<=2&&y<=2?-1:0,depth:depth/pts.length,color:'rgb('+shaded.join(',')+')'};
+       if(covered)face.cutaway=this.cutaway;
        if(material){face.material=material;face.uv=uv;}
        this.faces.push(face);
      }

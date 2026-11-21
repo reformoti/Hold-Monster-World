@@ -2,8 +2,11 @@
 (()=>{'use strict';const S=window.HoMoWWorldStyle;
 window.HoMoWCreatureArt={
  creature(m,time){const R=window.BrukRealms,t=R.TYPES[m.type],v=S.mob(m.type),f=v.family,c=v.color,accent=v.accent;
- const scale=Math.max(.7,t.radius/22)*(t.boss?1.14:1),angle=Math.atan2(m.facing?.x||0,m.facing?.y??1),ca=Math.cos(angle),sa=Math.sin(angle),walk=this.opt?.animations===false?0:m.walking?Math.sin((m.footstep||time*10)):0,bob=this.opt?.animations===false?0:Math.sin(time*2+v.seed%9)*.6;
- const p=(x,y,z,sx,sy,sz,col=c,kind='cube',turn=0)=>this.draw(kind,m.x+(x*ca+z*sa)*scale,(y+bob)*scale,m.y+(-x*sa+z*ca)*scale,sx*scale,sy*scale,sz*scale,col,angle+turn);
+ const scale=window.HoMoWScale.creature(v,t),angle=Math.atan2(m.facing?.x||0,m.facing?.y??1),ca=Math.cos(angle),sa=Math.sin(angle),walk=this.opt?.animations===false?0:m.walking?Math.sin((m.footstep||time*10)):0,bob=this.opt?.animations===false?0:Math.sin(time*2+v.seed%9)*.6;
+ let top=0;
+ const p=(x,y,z,sx,sy,sz,col=c,kind='cube',turn=0)=>{
+ top=Math.max(top,(y+bob+sy*(kind==='cube'?.5:1))*scale);
+ this.draw(kind,m.x+(x*ca+z*sa)*scale,(y+bob)*scale,m.y+(-x*sa+z*ca)*scale,sx*scale,sy*scale,sz*scale,col,angle+turn);};
  if(this.opt?.shadows!==false)p(0,1,0,23,1,20,'447a52','sphere');
  const eye=(x,y,z,color='f5d76e',size=3)=>{p(x,y,z,size,size,2,'233947');p(x,y,z+1,size*.5,size*.5,1,color);};
  const legs=(wide,length,height,color)=>{for(const x of [-wide,wide])for(const z of [-length,length]){const stride=walk*(x*z>0?1:-1)*3;p(x,height/2+Math.max(0,stride),z+stride,7,height,8,color);p(x,4,z+3+stride,9,6,12,color);}};
@@ -23,9 +26,11 @@ window.HoMoWCreatureArt={
  else {humanoid(['mage','stormmage','firemage','necromancer'].includes(f));if(['mage','stormmage','firemage','necromancer'].includes(f)){p(0,82,0,24,3,23,accent);p(0,83,0,12,30,12,c,'cone');p(23,41,4,4,73,4,'886745');p(23,82,4,8,12,8,f==='firemage'?'ffd277':accent,'sphere');}else if(f==='knight'){p(0,47,10,25,24,4,'a8c4ce');p(0,78,0,23,10,22,'bacbd0');p(0,87,0,5,17,18,accent);p(-26,43,9,5,32,27,'4e7c9b');p(23,44,10,5,55,5,'d5e7e6');}else{p(0,82,0,24,6,22,f==='rogue'?'343b5b':'7d5233');p(0,69,11,20,7,2,f==='rogue'?'56689b':'8c4a36');p(22,36,12,4,26,4,'cbd2ce');if(f==='rogue')p(-22,36,12,4,26,4,'cbd2ce');}}
  // Each variant has its own accent placement, not just a shared recolour.
  if(v.crest===0)p(0,t.boss?104:48,-12,7,12,5,accent,'cone');else if(v.crest===1)p(-18,39,-2,6,13,9,accent);else if(v.crest===2)p(0,30,-18,11,5,8,accent);else p(17,26,-4,5,7,5,accent,'sphere');
- if(v.elite){for(let i=0;i<3;i++)p((i-1)*9,t.radius>30?107:83,0,5,11+i%2*4,5,'f2cf72','cone');}
- if(t.boss&&!v.elite){for(const x of [-14,14])p(x,97,0,6,13,6,'eed38a','cone');}
+ const crownBase=top/scale;
+ if(v.elite||t.boss){for(const i of [-1,0,1])p(i*5,crownBase-1,0,2.4,i?5:7,2.4,'edce83','cone');}
+ this.pickParts=null;
  if(m.telegraph)this.warning(m.telegraph,m);for(const h of m.hazards||[])this.warning(h,m);
+ return top;
  }
 };
 })();
