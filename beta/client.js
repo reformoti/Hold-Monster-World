@@ -73,7 +73,13 @@
   function screenToWorld(event){const r=canvas.getBoundingClientRect();return scene.pick(event.clientX-r.left,event.clientY-r.top);}
   const scene=new window.HoMoWFull.Scene(canvas);
   window.HoMoWBetaRuntime={world,scene,save:()=>save()};
-  window.HoMoWBetaTools.mount(world,scene,()=>keys.clear());
+  let loadingImportedSave=false;
+  window.HoMoWBetaTools.mount(world,scene,()=>keys.clear(),raw=>{
+    const normalized=new window.HoMoWFull.World(raw).save();
+    localStorage.setItem(KEY,JSON.stringify(normalized));
+    loadingImportedSave=true;
+    window.location.reload();
+  });
   let pointer=null,drag=null;
   canvas.addEventListener('pointermove',e=>{pointer=e;if(drag){scene.rotate((e.clientX-drag)*.008);drag=e.clientX;}if(scene.camera)world.aimTarget=screenToWorld(e);});
   canvas.addEventListener('pointerleave',()=>{pointer=null;world.aimTarget=null;drag=null;});
@@ -91,7 +97,7 @@
   function notice(text){$('worldNotice').textContent=text;}
   function announce(text){$('zoneMessage').textContent=text;$('zoneMessage').classList.add('visible');clearTimeout(zoneTimer);zoneTimer=setTimeout(()=>$('zoneMessage').classList.remove('visible'),2100);}
   window.addEventListener('bruk-cloud-snapshot',save);
-  function save(){window.BrukAchievementEvents?.record('homow.level',world.state.level,'max');window.BrukAchievementEvents?.record('homow.kills',Object.values(world.state.kills).reduce((sum,n)=>sum+n,0),'max');if(network){if(!network.connected)$('worldSaveState').textContent='Немає з’єднання з сервером';return network.connected;}try{localStorage.setItem(KEY,JSON.stringify(world.save()));$('worldSaveState').textContent='Прогрес збережено · v'+'0.13.0 · бета';return true;}catch{$('worldSaveState').textContent='Браузер не зберіг прогрес';return false;}}
+  function save(){if(loadingImportedSave)return true;window.BrukAchievementEvents?.record('homow.level',world.state.level,'max');window.BrukAchievementEvents?.record('homow.kills',Object.values(world.state.kills).reduce((sum,n)=>sum+n,0),'max');if(network){if(!network.connected)$('worldSaveState').textContent='Немає з’єднання з сервером';return network.connected;}try{localStorage.setItem(KEY,JSON.stringify(world.save()));$('worldSaveState').textContent='Прогрес збережено · v'+(window.BrukRelease.version+' · бета');return true;}catch{$('worldSaveState').textContent='Браузер не зберіг прогрес';return false;}}
   const panels=window.BrukRealmsPanels.create(world,{save,notice,hud:()=>hud(),clearKeys:()=>keys.clear(),focus:()=>canvas.focus({preventScroll:true})});
   const journey=window.BrukJourney.create(world,ground,{clearKeys:()=>keys.clear(),notice,focus:()=>canvas.focus({preventScroll:true})});
   function resizeWorld(){vignette=null;const r=canvas.getBoundingClientRect();viewWidth=Math.max(1,Math.round(r.width/viewScale));viewHeight=Math.max(1,Math.round(r.height/viewScale));const dims=O.dimensions(viewWidth,viewHeight,gfx,(window.devicePixelRatio||1)*viewScale);canvas.width=dims.width;canvas.height=dims.height;ctx.setTransform(canvas.width/viewWidth,0,0,canvas.height/viewHeight,0,0);ctx.imageSmoothingEnabled=!gfx.lowTextures;network?.setView(viewWidth,viewHeight);const label=document.getElementById('renderDimensions');if(label)label.textContent='Рендер: '+canvas.width+' × '+canvas.height+' · ≤'+(gfx.quality==='low'?30:gfx.quality==='medium'?45:60)+' FPS';}
@@ -114,7 +120,7 @@
   document.addEventListener('keyup',event=>keys.delete(event.code));window.addEventListener('blur',()=>keys.clear());document.addEventListener('visibilitychange',()=>{if(document.hidden){keys.clear();network?.stopInput();save();if(frameId!==null){cancelAnimationFrame(frameId);frameId=null;}}else{last=0;scheduleFrame();}});
   for(const action of ['attack','ability','dash','potion','merchant','inventory','mastery','market','mount'])$(action+'Action').addEventListener('click',()=>act(action));
   function scheduleFrame(){if(!disposed&&!document.hidden&&frameId===null)frameId=requestAnimationFrame(frame);}
-  function frame(time){frameId=null;if(disposed||document.hidden)return;const dt=last?Math.min(.2,(time-last)/1000):0;last=time;const running=!(document.querySelector('dialog[open]')||profile.open()||panels.open()||journey.open()||hudUI.open()||community.open()||partyUI.open()||expeditions.open())&&!document.hidden;if(running){const x=(keys.has('KeyD')||keys.has('ArrowRight')?1:0)-(keys.has('KeyA')||keys.has('ArrowLeft')?1:0),y=(keys.has('KeyS')||keys.has('ArrowDown')?1:0)-(keys.has('KeyW')||keys.has('ArrowUp')?1:0);let remaining=dt;while(remaining>.00001){const step=Math.min(.05,remaining);world.update(step,{...window.HoMoWCamera3D.movement(x,y,scene.yaw),attack:false,dash:dashRequested});dashRequested=false;remaining-=step;}}else if(network)network.stopInput();
+  function frame(time){frameId=null;if(disposed||document.hidden)return;const dt=last?Math.min(.2,(time-last)/1000):0;last=time;const running=!(document.querySelector('dialog[open]')||profile.open()||panels.open()||journey.open()||hudUI.open()||community.open()||partyUI.open()||expeditions.open())&&!document.hidden;if(!running||!dt)world.syncEncounter();if(running){const x=(keys.has('KeyD')||keys.has('ArrowRight')?1:0)-(keys.has('KeyA')||keys.has('ArrowLeft')?1:0),y=(keys.has('KeyS')||keys.has('ArrowDown')?1:0)-(keys.has('KeyW')||keys.has('ArrowUp')?1:0);let remaining=dt;while(remaining>.00001){const step=Math.min(.05,remaining);world.update(step,{...window.HoMoWCamera3D.movement(x,y,scene.yaw),attack:false,dash:dashRequested});dashRequested=false;remaining-=step;}}else if(network)network.stopInput();
     for(const event of world.drainEvents()){
       if(gfx.animations&&['hit','damage','heal','kill','gather','burst'].includes(event.type)&&V.inside(event,{...camera,width:viewWidth,height:viewHeight},100))effects.push({...event,life:1});
       if(event.type==='sound')window.HoMoWSound.play(event.kind);if(event.type==='gather')window.HoMoWSound.play('gather');if(event.type==='achievement'){window.HoMoWSound.play('achievement');announce('Досягнення: '+event.name);}if(event.type==='cluster'){announce('Кластер: '+event.name);}if(event.type==='kill')notice(`Здолано: ${R.TYPES[event.monsterType].name} · +${event.silver} срібла · +${event.xp} досвіду · ресурси в сумці`);

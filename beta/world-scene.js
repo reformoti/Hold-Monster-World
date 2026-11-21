@@ -6,15 +6,24 @@ class Scene extends window.HoMoWBeta3D.Scene{
  setup(w){this.opt=window.HoMoWOptions.get();const r=this.input.getBoundingClientRect();this.width=r.width;this.height=r.height;this.visual=this.motion.sample(w,performance.now()/1000,R.clusterOf(w.state));const bounds=R.DUNGEONS.find(d=>'dungeon:'+d.id===R.clusterOf(w.state))?.arena||{x:0,y:0,w:R.WIDTH,h:R.HEIGHT},cx=Math.max(bounds.x+100,Math.min(bounds.x+bounds.w-100,this.visual.state.x)),cy=Math.max(bounds.y+100,Math.min(bounds.y+bounds.h-100,this.visual.state.y));this.camera=C.create(this.width,this.height,cx,cy,this.yaw,this.zoom);Object.assign(this,this.camera);const opt=window.HoMoWOptions.get(),dims=window.HoMoWOptions.dimensions(this.width,this.height,opt,devicePixelRatio||1);if(this.canvas.width!==dims.width)this.canvas.width=dims.width;if(this.canvas.height!==dims.height)this.canvas.height=dims.height;if(!this.cpu){const g=this.gl;g.viewport(0,0,this.canvas.width,this.canvas.height);g.uniform4f(this.u.camera,this.spanX,this.spanY,0,0);g.uniform2f(this.u.center,this.cx,this.cz);g.uniform2f(this.u.orbit,this.camera.c,this.camera.s);}}
  draw(kind,x,y,z,...args){if(kind==='sphere'&&args[1]===1&&this.opt?.shadows===false)return;if(kind==='sphere'&&this.opt?.lowTextures)kind='cube';return super.draw(kind,x,y+(this.heroLift||0),z,...args);}
  hero(w){const s=w.state;this.heroLift=0;if(s.mounted){this.heroLift=this.mountModel(w);}super.hero({...w,time:this.opt?.animations===false?0:w.time,walking:this.opt?.animations===false?false:w.walking,footstep:this.opt?.animations===false?0:w.footstep,gait:this.opt?.animations===false?0:w.gait,twoHanded:s.weaponVariant?!R.offhandActive(s):false});this.heroLift=0;}
- weapon(w,a,bob){const s=w.state,f=s.weaponKind,v=R.VARIANTS[s.weaponVariant],length=v?.reach||1,arc=w.swing>0?Math.sin((1-w.swing/.3)*Math.PI)*1.2:0,turn=a+arc;
- const part=(x,y,z,sx,sy,sz,color,kind='cube')=>this.draw(kind,s.x+x*Math.cos(turn)+z*Math.sin(turn),y+bob,s.y-x*Math.sin(turn)+z*Math.cos(turn),sx,sy,sz,color,turn);
+ weapon(w,a,bob,pose){
+ const s=w.state,f=s.weaponKind,v=R.VARIANTS[s.weaponVariant],length=v?.reach||1;
+ const cs=Math.cos(a),sn=Math.sin(a);
+ const part=(x,y,z,sx,sy,sz,color,kind='cube',material='steel',twist=0)=>{
+   const leftBlade=pose.paired&&x<0;
+   const hand=leftBlade||f==='bow'?pose.left:pose.right;
+   const turn=a+(leftBlade?-pose.yaw:pose.yaw),dx=x-(leftBlade?-1:1)*pose.origin.x,dz=z-pose.origin.z;
+   this.draw(kind,s.x+hand.x*cs+hand.z*sn+dx*Math.cos(turn)+dz*Math.sin(turn),
+     hand.y+bob+y-pose.origin.y,s.y-hand.x*sn+hand.z*cs-dx*Math.sin(turn)+dz*Math.cos(turn),
+     sx,sy,sz,color,turn+twist,material);
+ };
  const id=s.weaponVariant;
  const tier=Math.max(0,s.variantArsenal?.[id]??0);
  const enchant=s.enchantments?.['variant:'+id]||0;
  const metal=tier>=9?'ebce90':tier>=5?'cbd9d8':'9caaaf';
  let socket=[20,34,40];
  if(f==='axe'){
-   part(20,34,22,5,5,60*length,'705c40');
+   part(20,34,22,5,5,60*length,'705c40','cube','wood');
    const z=24+26*length;
    part(30,34,z,20,8,16,metal,'blade');
    if(id==='axe_greataxe')part(10,34,z,20,8,16,metal,'blade');
@@ -23,14 +32,14 @@ class Scene extends window.HoMoWBeta3D.Scene{
  }
  if(f==='spear'){
    const tip=30+47*length;
-   part(18,32,30,4,4,95*length,'7b6646');
+   part(18,32,30,4,4,95*length,'7b6646','cube','wood');
    part(18,32,tip,id==='spear_glaive'?17:8,6,id==='spear_pike'?32:22,metal,'blade');
    if(id==='spear_glaive')part(26,32,tip+6,8,5,14,metal,'blade');
    socket=[18,32,tip];
  }
  if(f==='daggers'){
    for(const side of v?.hands===2?[-1,1]:[1]){
-     part(side*20,32,17,5,5,17,'6b5844');
+     part(side*20,32,17,5,5,17,'826548','cube','leather');
      if(id==='daggers_claws'){
        part(side*20,32,21,14,5,10,metal);
        for(const offset of [-5,0,5])part(side*20+offset,32,25,3,4,16,metal,'blade');
@@ -40,20 +49,20 @@ class Scene extends window.HoMoWBeta3D.Scene{
  }
  if(f==='bow'){
    const span=id==='bow_warbow'?26:id==='bow_crossbow'?16:21;
-   part(0,37,20,span*2,4,5,'826842');
+   part(0,37,20,span*2,4,5,'826842','cube','wood');
    for(const side of [-1,1]){
-     part(side*span,37,14,6,5,16,'a88a57');
-     part(side*span/2,37,6,span,1,1,'dbd5ad');
+     part(side*span,37,14,6,5,16,'a88a57','cube','wood');
+     part(side*span/2,37,6,span,1,1,'dbd5ad','cube',null);
      if(id==='bow_warbow')part(side*span,37,21,7,7,8,metal);
    }
-   if(id==='bow_crossbow')part(0,36,6,7,6,40,'796346');
-   else part(0,38,23,2,2,42,'dacdb0');
+   if(id==='bow_crossbow')part(0,36,6,7,6,40,'796346','cube','wood');
+   else part(0,38,23,2,2,42,'dacdb0','cube','wood');
    socket=[0,37,20];
  }
  if(f==='staff'){
    const top=38+34*length;
-   part(19,38,6,5,68*length,5,'7a6853');
-   part(19,top,6,11,17,11,id==='staff_frost'?'9ed7e6':'e7af72',id==='staff_frost'?'cone':'sphere');
+   part(19,38,6,5,68*length,5,'7a6853','cube','wood');
+   part(19,top,6,11,17,11,id==='staff_frost'?'9ed7e6':'e7af72',id==='staff_frost'?'cone':'sphere','rune');
    if(id==='staff_greatfire')for(const side of [-1,1])part(19+side*7,top,6,5,19,5,metal,'cone');
    socket=[19,top-8,6];
  }
@@ -62,10 +71,9 @@ class Scene extends window.HoMoWBeta3D.Scene{
  for(let i=1;i<=Math.floor(tier/3);i++)part(x,y+i*1.5,z-i*3,8,4,2,metal);
  if(enchant){
    const color=window.HoMoWBeta3D.runeColors[enchant];
-   for(let i=0;i<enchant;i++){
-     const phase=w.time*2+i*2.4;
-     part(x+Math.cos(phase)*6,y+5+Math.sin(phase)*4,z+i*2,3,3,3,color,'sphere');
-   }
+   part(x,y+3,z,4,3,6,color,'orb','rune');
+   window.HoMoWBeta3D.enchantEffect(enchant,w.time,(dx,dy,dz,sx,sy,sz,ink,kind,twist)=>
+     part(x+dx,y+dy,z+dz,sx,sy,sz,ink,kind,null,twist));
  }
  }
 
@@ -121,7 +129,7 @@ class Scene extends window.HoMoWBeta3D.Scene{
  for(const d of R.DUNGEONS){const p=d.entry;if(p&&show(p)){this.draw('cone',p.x,1,p.y,65,90,60,'566873');this.tag(d.name,p.x,p.y,110);}}
  if(show(R.MONOLITH)){const p=R.MONOLITH;this.draw('cube',p.x,62,p.y,35,124,35,w.state.monolithAwakened?'7fc6ba':'74877b');this.tag('E · Моноліт',p.x,p.y,145);}
  if(show(R.BILLBOARD)){const p=R.BILLBOARD;this.draw('sphere',p.x,0,p.y,110,1,95,'d5c394');for(const dx of [-40,40])this.draw('cube',p.x+dx,37,p.y,7,74,7,'755a3d');this.draw('cube',p.x,56,p.y,90,43,8,'ad8a56');this.draw('roof',p.x,80,p.y,108,14,30,'4e797b');this.tag('E · Дошка пошани',p.x,p.y,85);}
- for(const m of w.monsters){if(!m.alive||!show(m))continue;this.creature(m,this.opt?.animations===false?0:w.time);const t=R.TYPES[m.type];this.tag(t.name+' · '+(t.level||1),m.x,m.y,t.boss?155:85,m.hp/t.hp,true);this.visible++;}
+ for(const m of w.monsters){if(!m.alive||!show(m))continue;this.creature(m,this.opt?.animations===false?0:w.time);const t=R.TYPES[m.type];this.tag((m.encounterSlot!==undefined?'◆ ':'')+t.name+' · '+(t.level||1),m.x,m.y,t.boss?155:85,m.hp/t.hp,true);this.visible++;}
  for(const d of w.state.drops){if(show(d))this.draw('cube',d.x,7,d.y,15,14,15,'d2b36f');}
  for(const p of w.projectiles){if(show(p))this.draw('sphere',p.x,28,p.y,p.magic?7:3,p.magic?7:3,9,p.magic?'c8a6e5':'e8d9af');}
  this.hero({...w,state:this.visual.state,facing:this.visual.facing,gait:this.visual.gait});this.combat({...w,effects:[]});for(const e of effects){if(!this.visibleAt(e))continue;if(e.type==='burst')this.ring(e.x,e.y,e.radius||80,'e0c78e');else if(['hit','damage','heal','gather'].includes(e.type))this.tag(e.type==='gather'?'+'+e.amount:(e.type==='heal'?'+':'')+(e.value||''),e.x,e.y,70+(1-e.life)*45,1,e.type==='damage');}this.tag((w.onlineName||'Мандрівник')+' · '+w.state.level,this.visual.state.x,this.visual.state.y,w.state.mounted?155:105,w.state.hp/R.maxHp(w.state));
