@@ -1,4 +1,4 @@
-# HoMoW · 3D-бета 0.8.0
+# HoMoW · 3D-бета 0.14.0
 
 Єдина сторінка бети: https://reformoti.github.io/Hold-Monster-World/beta/
 
@@ -67,3 +67,12 @@ All resource nodes and overworld monster camps are validated against obstacles, 
 
 ## 0.12.0 · 2026-11-20
 Redesigned progression constellation with path cards, category colors, progress tracks, curved connections and a readable inspector. Branch-focused view isolates its nodes; the toolbar returns to the overview. Talent costs, prerequisites, XP, training and saved progress remain canonical.
+
+## 0.13.0 · 2026-11-21
+Distinct geometry for all 18 weapon variants with tier ornamentation and eight enchantment effects.
+
+## 0.14.0 · 2026-11-21
+
+Кожні 10 хвилин за годинником у випадковому регіоні з’являється мандрівна зграя з трьох місцевих ворогів. Вона залишається на дві хвилини. Рожевий ромб на карті (M) показує місце, поруч із картою видно назву регіону, кількість ворогів і час. Меню та перезавантаження сторінки не подовжують подію. Переможені вороги дають звичайну здобич один раз за появу. Локальне збереження та експорт зберігають їхнє здоров’я до кінця поточного вікна.
+
+Сталь, дерево, шкіра й руни отримали процедурні текстури в ігровому світі та в рюкзаку. Кожне зачарування від .1 до .8 має свій ефект, зокрема блискавку на .7 і рухоме кільце на .8. Руки й зброя використовують спільні точки хвату. Портрет вміщує довгі клинки під час повороту й показує обидва ока у ракурсі три чверті.

@@ -4,7 +4,7 @@ import re
 import subprocess
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
-VERSION = '0.12.0'
+VERSION = '0.14.0'
 
 def replace_once(text, old, new):
     if text.count(old) != 1:
@@ -41,7 +41,7 @@ def build():
     (HERE / 'music.js').write_text(music)
     html = re.sub(r'src="../homow-music\.js[^"]*"', 'src="music.js?v='+VERSION+'"', html)
     html = re.sub(r'src="../release\.js[^"]*"', 'src="release.js?v='+VERSION+'"', html)
-    (HERE / 'release.js').write_text("window.BrukRelease=Object.freeze({version:'"+VERSION+"',date:'2026-11-20',name:'3D-бета'});document.querySelectorAll('[data-game-version]').forEach(el=>el.textContent='v"+VERSION+" · БЕТА');document.title='HoMoW · 3D-бета "+VERSION+"';\n")
+    (HERE / 'release.js').write_text("window.BrukRelease=Object.freeze({version:'"+VERSION+"',date:'2026-11-21',name:'3D-бета'});document.querySelectorAll('[data-game-version]').forEach(el=>el.textContent='v"+VERSION+" · БЕТА');document.title='HoMoW · 3D-бета "+VERSION+"';\n")
     inventory = (ROOT / 'homow-inventory.js').read_text()
     start = inventory.index('function preview(')
     end = inventory.index('function change(', start)
@@ -55,9 +55,10 @@ def build():
     html = html.replace('</head>', '<link rel="stylesheet" href="inventory.css?v='+VERSION+'"></head>')
     html = html.replace('</head>', '<link rel="stylesheet" href="destiny.css?v='+VERSION+'"></head>')
     html = html.replace('</head>', '<link rel="stylesheet" href="world.css?v='+VERSION+'"></head>')
+    html = replace_once(html, '<canvas id="worldMap"', '<p id="encounterStatus" class="encounter-status" role="timer"></p><canvas id="worldMap"')
     html = html.replace('<body>', '<body><aside class="beta-banner">3D-бета '+VERSION+' · Повний світ · Локальна перевірка <a href="../">Основна гра</a></aside>')
     html = re.sub(r'(<script src="../realms-core\.js[^"]*"></script>)', r'\1<script src="layout.js?v='+VERSION+'"></script>', html)
-    html = html.replace('<script src="client.js', '<script src="camera3d.js?v='+VERSION+'"></script><script src="scene3d.js?v='+VERSION+'"></script><script src="world.js?v='+VERSION+'"></script><script src="skills.js?v='+VERSION+'"></script><script src="world-style.js?v='+VERSION+'"></script><script src="world-art.js?v='+VERSION+'"></script><script src="creature-art.js?v='+VERSION+'"></script><script src="motion.js?v='+VERSION+'"></script><script src="mount-art.js?v='+VERSION+'"></script><script src="world-scene.js?v='+VERSION+'"></script><script src="portrait.js?v='+VERSION+'"></script><script src="tools.js?v='+VERSION+'"></script><script src="client.js')
+    html = html.replace('<script src="client.js', '<script src="camera3d.js?v='+VERSION+'"></script><script src="materials.js?v='+VERSION+'"></script><script src="scene3d.js?v='+VERSION+'"></script><script src="encounter-sites.js?v='+VERSION+'"></script><script src="world.js?v='+VERSION+'"></script><script src="skills.js?v='+VERSION+'"></script><script src="world-style.js?v='+VERSION+'"></script><script src="world-art.js?v='+VERSION+'"></script><script src="creature-art.js?v='+VERSION+'"></script><script src="motion.js?v='+VERSION+'"></script><script src="mount-art.js?v='+VERSION+'"></script><script src="world-scene.js?v='+VERSION+'"></script><script src="portrait.js?v='+VERSION+'"></script><script src="tools.js?v='+VERSION+'"></script><script src="client.js')
     html = html.replace('Hold Monsters World · HoMoW', 'HoMoW · Повний світ · 3D-бета '+VERSION)
     html = html.replace('пробіл — атака', 'ЛКМ — атака')
     (HERE / 'index.html').write_text(html.rstrip()+'\n')
@@ -71,7 +72,13 @@ def build():
     end = ui.index('  function minimap()', start)
     ui = ui[:start] + '''  const scene=new window.HoMoWFull.Scene(canvas);
   window.HoMoWBetaRuntime={world,scene,save:()=>save()};
-  window.HoMoWBetaTools.mount(world,scene,()=>keys.clear());
+  let loadingImportedSave=false;
+  window.HoMoWBetaTools.mount(world,scene,()=>keys.clear(),raw=>{
+    const normalized=new window.HoMoWFull.World(raw).save();
+    localStorage.setItem(KEY,JSON.stringify(normalized));
+    loadingImportedSave=true;
+    window.location.reload();
+  });
   let pointer=null,drag=null;
   canvas.addEventListener('pointermove',e=>{pointer=e;if(drag){scene.rotate((e.clientX-drag)*.008);drag=e.clientX;}if(scene.camera)world.aimTarget=screenToWorld(e);});
   canvas.addEventListener('pointerleave',()=>{pointer=null;world.aimTarget=null;drag=null;});
@@ -95,7 +102,9 @@ def build():
     ui = replace_once(ui, "attack:keys.has('Space')", 'attack:false')
     ui = replace_once(ui, "'Space',", '')
     ui = ui.replace("const running=!(profile.open()", "const running=!(document.querySelector('dialog[open]')||profile.open()")
-    ui = ui.replace("window.BrukRelease.version", "'0.12.0 · бета'")
+    ui = replace_once(ui, 'function save(){', 'function save(){if(loadingImportedSave)return true;')
+    ui = replace_once(ui, 'if(running){const x=', 'if(!running||!dt)world.syncEncounter();if(running){const x=')
+    ui = ui.replace("window.BrukRelease.version", "(window.BrukRelease.version+' · бета')")
     ui = ui.replace("})();", "document.querySelectorAll('#gameLocale option:not([value=uk])').forEach(el=>el.remove());document.documentElement.lang='uk';document.querySelector('.homow-download')?.setAttribute('href','../homow.html');})();")
     (HERE / 'client.js').write_text('// Generated by beta/build.py; edit canonical UI or this generator.\n'+ui.rstrip()+'\n')
 

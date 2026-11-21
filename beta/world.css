@@ -5,3 +5,6 @@
 
 #scene3d{filter:saturate(1.16) brightness(1.06)}.world-frame:after{background:radial-gradient(ellipse at center,transparent 65%,#0e3a1820)}.scene-label>i[hidden]{display:none}.scene-label{font-size:10px;text-shadow:0 1px 3px #173a28}
 .scene-label>span{white-space:pre-line;display:block;line-height:1.5}.scene-label[data-side=player]>span{padding:3px 7px;border-radius:5px;background:#122e2f99}.cluster-transition{position:absolute;left:50%;top:19%;transform:translateX(-50%);pointer-events:none;z-index:8;opacity:0;color:#f6e4b7;background:linear-gradient(90deg,transparent,#142d35eb 15%,#142d35eb 85%,transparent);padding:14px 60px;text-align:center;font:600 23px Georgia,serif;white-space:nowrap}.cluster-transition.show{animation:cluster-arrival 2.3s ease both}@keyframes cluster-arrival{0%{opacity:0;translate:0 7px}15%,72%{opacity:1;translate:0 0}100%{opacity:0}}@media(prefers-reduced-motion:reduce){.cluster-transition.show{animation-duration:1s}}
+
+.encounter-status{margin:.4rem 0 .65rem;color:#d9c9ac;font-variant-numeric:tabular-nums}
+.encounter-status[data-active="true"]::before{content:"◆";color:#ff77b3;margin-inline-end:.45em}
