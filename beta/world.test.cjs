@@ -186,3 +186,38 @@ test('pack kills pay once and survive beta save, export and reload within the sa
   const next = new World(saved, Math.random, () => now);
   assert(next.encounter.members.every(m => m.alive && m.hp === R.TYPES[m.type].hp));
 });
+
+test('every weapon and forge tier has different vertex geometry before enchantment',()=>{
+ const crypto=require('node:crypto'),env={};env.window=env;vm.createContext(env);
+ for(const file of ['faceted-meshes.js','armory.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),env);
+ const all=new Set();
+ for(const id of Object.keys(R.VARIANTS)){
+   for(let tier=0;tier<=R.MAX_TIER;tier++){
+     const model=env.HoMoWArmory.get(id,tier),hash=crypto.createHash('sha256');
+     for(const {mesh,slot} of model.parts){
+       assert.match(model.colors[slot],/^[0-9a-f]{6}$/);
+       const data=env.HoMoWForms.meshes.get(mesh);assert(data.length>=18&&data.length%18===0);
+       for(let i=0;i<data.length;i+=6){
+         assert(Number.isFinite(data[i]+data[i+1]+data[i+2]));
+         assert(Math.abs(Math.hypot(data[i+3],data[i+4],data[i+5])-1)<1e-5);
+       }
+       hash.update(Buffer.from(data.buffer,data.byteOffset,data.byteLength));
+     }
+     const signature=hash.digest('hex');assert(!all.has(signature),id+' T'+tier);all.add(signature);
+     assert.deepEqual(env.HoMoWArmory.get(id,tier),model);
+   }
+ }
+ assert.equal(all.size,Object.keys(R.VARIANTS).length*(R.MAX_TIER+1));
+});
+
+test('overlapping armor facets resolve per pixel in either draw order',()=>{
+ const env={HoMoWMaterials:{}};env.window=env;vm.createContext(env);
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'raster.js'),'utf8'),env);
+ const ctx={createImageData:(w,h)=>({data:new Uint8ClampedArray(w*h*4)}),putImageData(image){this.output=image.data;}};
+ const face=(rgb,depths)=>({rgb,pts:[[0,0],[8,0],[0,8]].map(([x,y],i)=>({x,y,depth:depths[i]}))});
+ const red=face([240,20,15],[1,9,1]),gold=face([210,185,80],[4,4,4]);
+ const view={ctx,canvas:{width:8,height:8},width:8,height:8,faces:[red,gold]};
+ const pixel=(x,y)=>Array.from(ctx.output.slice((y*8+x)*4,(y*8+x)*4+4));
+ env.HoMoWRaster.flush(view,true);assert.deepEqual(pixel(1,1),[210,185,80,255]);assert.deepEqual(pixel(5,1),[240,20,15,255]);
+ view.faces.reverse();env.HoMoWRaster.flush(view,true);assert.deepEqual(pixel(1,1),[210,185,80,255]);assert.deepEqual(pixel(5,1),[240,20,15,255]);
+});

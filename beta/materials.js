@@ -103,5 +103,5 @@
     ctx.restore();
   }
 
-  window.HoMoWMaterials = {units, texture, uv, paint};
+  window.HoMoWMaterials = {units, tileSize:size, pixels, texture, uv, paint};
 })();

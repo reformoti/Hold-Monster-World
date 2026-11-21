@@ -4,7 +4,7 @@ import re
 import subprocess
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
-VERSION = '0.14.0'
+VERSION = '0.15.0'
 
 def replace_once(text, old, new):
     if text.count(old) != 1:
@@ -45,11 +45,14 @@ def build():
     inventory = (ROOT / 'homow-inventory.js').read_text()
     start = inventory.index('function preview(')
     end = inventory.index('function change(', start)
-    inventory = inventory[:start] + "function preview(parent,appearance=world.state.appearance){window.HoMoWPortrait(parent,world,appearance); }\n" + inventory[end:]
+    inventory = inventory[:start] + "function preview(parent,appearance=world.state.appearance,body=false){window.HoMoWPortrait(parent,world,appearance,null,body); }\n" + inventory[end:]
     inventory = inventory.replace("!world.nearCamp()||world.state.silver<m.cost", "!R.serviceAllowed(world,'buyMount')||world.state.silver<m.cost")
     inventory = inventory.replace('art.innerHTML=mountIcon(id);', 'window.HoMoWPortrait(art,world,world.state.appearance,id);')
     inventory = inventory.replace("const owned=world.state.mounts[id],card=", "const owned=world.state.mounts[id],card=")
     inventory = inventory.replace("card.dataset.mountId=id;", "if(!owned)card.append(el('small','mount-status',!R.serviceAllowed(world,'buyMount')?'Підійди до інтенданта · скакуни та припаси':world.state.silver<m.cost?'Бракує срібла: '+(m.cost-world.state.silver).toLocaleString('uk-UA'):'Доступний для придбання'));card.dataset.mountId=id;")
+    inventory = replace_once(inventory, "preview(figure,draft);const controls", "let equipped=false;const paint=()=>{figure.replaceChildren();preview(figure,draft,!equipped);};paint();const controls")
+    inventory = replace_once(inventory, "figure.replaceChildren();preview(figure,draft);", "paint();")
+    inventory = replace_once(inventory, "controls.append(btn('Зберегти вигляд'", "const gear=btn('Показати спорядження',()=>{equipped=!equipped;gear.setAttribute('aria-pressed',String(equipped));paint();});gear.setAttribute('aria-pressed','false');controls.append(gear,btn('Зберегти вигляд'")
     (HERE / 'inventory.js').write_text(inventory)
     html = re.sub(r'src="../homow-inventory\.js[^"]*"', 'src="inventory.js?v='+VERSION+'"', html)
     html = html.replace('</head>', '<link rel="stylesheet" href="inventory.css?v='+VERSION+'"></head>')
@@ -58,11 +61,12 @@ def build():
     html = replace_once(html, '<canvas id="worldMap"', '<p id="encounterStatus" class="encounter-status" role="timer"></p><canvas id="worldMap"')
     html = html.replace('<body>', '<body><aside class="beta-banner">3D-бета '+VERSION+' · Повний світ · Локальна перевірка <a href="../">Основна гра</a></aside>')
     html = re.sub(r'(<script src="../realms-core\.js[^"]*"></script>)', r'\1<script src="layout.js?v='+VERSION+'"></script>', html)
-    html = html.replace('<script src="client.js', '<script src="camera3d.js?v='+VERSION+'"></script><script src="materials.js?v='+VERSION+'"></script><script src="scene3d.js?v='+VERSION+'"></script><script src="encounter-sites.js?v='+VERSION+'"></script><script src="world.js?v='+VERSION+'"></script><script src="skills.js?v='+VERSION+'"></script><script src="world-style.js?v='+VERSION+'"></script><script src="world-art.js?v='+VERSION+'"></script><script src="creature-art.js?v='+VERSION+'"></script><script src="motion.js?v='+VERSION+'"></script><script src="mount-art.js?v='+VERSION+'"></script><script src="world-scene.js?v='+VERSION+'"></script><script src="portrait.js?v='+VERSION+'"></script><script src="tools.js?v='+VERSION+'"></script><script src="client.js')
+    html = html.replace('<script src="client.js', '<script src="camera3d.js?v='+VERSION+'"></script><script src="materials.js?v='+VERSION+'"></script><script src="raster.js?v='+VERSION+'"></script><script src="faceted-meshes.js?v='+VERSION+'"></script><script src="armory.js?v='+VERSION+'"></script><script src="armory-icons.js?v='+VERSION+'"></script><script src="avatar.js?v='+VERSION+'"></script><script src="scene3d.js?v='+VERSION+'"></script><script src="encounter-sites.js?v='+VERSION+'"></script><script src="world.js?v='+VERSION+'"></script><script src="skills.js?v='+VERSION+'"></script><script src="world-style.js?v='+VERSION+'"></script><script src="world-art.js?v='+VERSION+'"></script><script src="creature-art.js?v='+VERSION+'"></script><script src="motion.js?v='+VERSION+'"></script><script src="mount-art.js?v='+VERSION+'"></script><script src="world-scene.js?v='+VERSION+'"></script><script src="portrait.js?v='+VERSION+'"></script><script src="tools.js?v='+VERSION+'"></script><script src="client.js')
     html = html.replace('Hold Monsters World · HoMoW', 'HoMoW · Повний світ · 3D-бета '+VERSION)
     html = html.replace('пробіл — атака', 'ЛКМ — атака')
     (HERE / 'index.html').write_text(html.rstrip()+'\n')
     ui = (ROOT / 'realms-ui.js').read_text()
+    ui = replace_once(ui, 'M.decorate(A,R);', 'M.decorate(A,R);window.HoMoWArmoryIcons.install(A,R);')
     ui = replace_once(ui, "KEY='brukivka_realms_v1'", "KEY='homow_beta_full_v1'")
     ui = ui.replace("const raw=localStorage.getItem(KEY);", "const raw=localStorage.getItem(KEY)||localStorage.getItem('brukivka_realms_v1');")
     ui = ui.replace("if(raw&&saved.schema!==2&&!localStorage.getItem('brukivka_realms_backup_v1'))localStorage.setItem('brukivka_realms_backup_v1',raw);", '')
