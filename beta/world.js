@@ -1,5 +1,5 @@
 /* Beta-only adapters. Canonical rules, collision geometry and saves remain shared. */
-(function(root,factory){if(typeof module==='object'&&module.exports)module.exports=factory(require('../realms-core.js'),require('./encounter-sites.js'));else root.HoMoWFull=factory(root.BrukRealms,root.HoMoWEncounterSites);})(typeof window==='undefined'?globalThis:window,function(R,encounterSites){
+(function(root,factory){if(typeof module==='object'&&module.exports)module.exports=factory(require('./core.js'),require('./encounter-sites.js'));else root.HoMoWFull=factory(root.BrukRealms,root.HoMoWEncounterSites);})(typeof window==='undefined'?globalThis:window,function(R,encounterSites){
 'use strict';
 const encounterPeriod = 10 * 60_000;
 const encounterDuration = 2 * 60_000;
@@ -19,6 +19,24 @@ class World extends R.World {
     this.wallClock = wallClock;
     this.encounter = null;
     this.syncEncounter(saved?.betaEncounter);
+  }
+
+  bindHome(){
+    const s=this.state,city=R.inCity(s.x,s.y);
+    if(this.inCombat()||this.duelActive||!this.nearCamp()||city&&!s.passUnlocked)
+      return {ok:false,message:'Прив’язка доступна в мирному поселенні поза боєм.'};
+    if(!R.nearby(s,'quartermaster')&&!(city&&Math.hypot(s.x-R.CITY_LANDMARKS.inn.x,s.y-R.CITY_LANDMARKS.inn.y)<105))
+      return {ok:false,message:'Підійди до інтенданта або міського заїзду.'};
+    s.homeTown=city?'city':'village';
+    return {ok:true,message:'Місце відродження: '+this.homeName()+'.'};
+  }
+  homeName(){return this.state.homeTown==='city'?'Місто Вартових':'Містечко Вербове';}
+  emit(type,data={}){
+    if((type==='death'||type==='recall')&&this.state.homeTown==='city'&&this.state.passUnlocked){
+      const inn=R.CITY_LANDMARKS.inn;Object.assign(this.state,{x:inn.x,y:inn.y});
+      this.path=[];this.target=null;this.selectedNode=null;this.gathering=null;
+    }
+    super.emit(type,data);
   }
 
   syncEncounter(saved) {

@@ -1,6 +1,6 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const R=require('../realms-core.js'),{World}=require('./world.js');
-test('beta shares all canonical world content and save schema',()=>{const a=new World({}, Math.random, () => 120000),b=new R.World();assert.deepEqual(a.state,b.state);assert.equal(a.monsters.length,141);assert.equal(a.nodes.length,190);assert.equal(R.CLUSTERS.length,12);assert.equal(R.DUNGEONS.length,3);a.state.silver=12345;a.state.kills.slime=5;a.gainXp(300);const save=a.save();assert.deepEqual(new R.World(save).state,new World(save).state);});
+test('beta shares all canonical world content and save schema',()=>{const a=new World({}, Math.random, () => 120000),b=new R.World();const {betaProgression,reserveXp,homeTown,...shared}=a.state;assert.deepEqual(shared,b.state);assert.equal(homeTown,'village');assert.equal(a.monsters.length,141);assert.equal(a.nodes.length,190);assert.equal(R.CLUSTERS.length,12);assert.equal(R.DUNGEONS.length,3);a.creditSilver(12345);a.state.kills.slime=5;a.gainXp(300);const save=a.save();assert.deepEqual(new World(save).state,a.state);assert.equal(new R.World(save).state.silver,12345);});
 test('beta manual attacks miss behind the aim and preserve exact damage and cooldown',()=>{const w=new World(),m=w.monsters[0];w.state.x=m.x-35;w.state.y=m.y;w.aimTarget={x:w.state.x-500,y:w.state.y};const hp=m.hp;assert(w.attack());assert.equal(m.hp,hp);assert(!w.attack());w.attackCooldown=0;w.aimTarget={x:w.state.x+500,y:w.state.y};assert(w.attack());assert(m.hp<hp);assert.deepEqual(w.facing,{x:1,y:0});});
 test('beta ranged attacks use cursor direction with canonical mana and damage',()=>{const w=new World();w.state.weaponKind='staff';w.state.mana=100;w.aimTarget={x:w.state.x,y:w.state.y-300};w.attack();assert.equal(w.state.mana,94);assert.equal(w.projectiles.length,1);assert(Math.abs(w.projectiles[0].vx)<1e-8);assert(w.projectiles[0].vy<0);});
 test('walking ignores cursor and canonical house collisions remain effective',()=>{const w=new World({x:130,y:220});w.aimTarget={x:-500,y:-500};for(let i=0;i<120;i++)w.update(.05,{x:1});assert(w.state.x<136);assert(w.facing.x>0);assert.equal(w.facing.y,0);});
@@ -94,7 +94,38 @@ test('canonical full UI boots and renders all clusters with software 3D without 
  for(const area of R.CLUSTERS){world.state.x=area.x+area.w/2;world.state.y=area.y+area.h/2;scene.render(world);assert(scene.visible>=0);assert(Number.isFinite(scene.camera.cx));}for(const id of Object.keys(R.VARIANTS)){world.state.weaponVariant=id;world.state.weaponKind=R.VARIANTS[id].family;scene.render(world);}for(const id of Object.keys(R.MOUNTS)){world.state.mounted=true;world.state.selectedMount=id;scene.render(world);}world.state.mounted=false;
  assert(env.HoMoWGeography.borders.length>50);for(const b of env.HoMoWGeography.borders)assert(betaR.PORTALS.every(p=>Math.hypot(p.x-b.x,p.y-b.y)>=195),'clear crossing');const trees=new Set();for(let i=0;i<12;i++){geometry=[];scene.treeModel(500,500,2,1,true,'forest',i);trees.add(JSON.stringify(geometry));}assert(trees.size>=6,'tree silhouettes and sizes');assert.equal(betaR.CLUSTERS.length,13);assert.equal(betaR.clusterOf(betaR.SPAWN),'village');assert.equal(betaR.PORTALS.filter(p=>p.village).length,4);
  for(const p of betaR.PORTALS.filter(p=>p.village)){for(const entering of [false,true]){world.lastCombat=-100;world.time=100;world.duelActive=false;const sign=p.axis==='x'?(p.x===betaR.VILLAGE.x?1:-1):(p.y===betaR.VILLAGE.y?1:-1);world.state.x=p.x+(p.axis==='x'?sign*(entering?-25:25):0);world.state.y=p.y+(p.axis==='y'?sign*(entering?-25:25):0);const result=world.crossCluster(p.id);assert(result.ok,p.id+':'+result.message);assert.equal(betaR.clusterOf(world.state),entering?'village':'c00');}}
- Object.assign(world.state,betaR.SPAWN);document.getElementById('inventoryAction').click();assert(document.getElementById('inventoryDialog').open);assert(document.querySelector('.pack-preview'));document.querySelector('[data-pack-tab=mounts]').click();assert.equal(document.querySelectorAll('.mount-preview').length,4);const mounts=new Set();for(const id of Object.keys(betaR.MOUNTS)){geometry=[];scene.mountModel({state:{x:500,y:500,selectedMount:id},facing:{x:0,y:1},walking:true,footstep:.5});mounts.add(JSON.stringify(geometry));}assert.equal(mounts.size,4);const oldCoins=world.state.silver;world.state.silver=20000;world.state.x=betaR.TRADERS.quartermaster.x;world.state.y=betaR.TRADERS.quartermaster.y;const bought=world.buyMount('donkey');assert(bought.ok,JSON.stringify({bought,xy:[world.state.x,world.state.y],v:betaR.VILLAGE,owned:world.state.mounts,near:world.nearCamp()}));assert.equal(world.state.silver,19650);assert(world.state.mounts.donkey);assert(new env.HoMoWFull.World(world.save()).state.mounts.donkey);world.state.silver=oldCoins;document.querySelector('[data-pack-tab=appearance]').click();assert.equal(document.querySelectorAll('.appearance-controls select').length,6);document.getElementById('closeInventory').click();document.getElementById('masteryAction').click();assert(document.getElementById('masteryDialog').open);assert(document.querySelector('.destiny-summary'));assert.equal(document.querySelectorAll('.destiny-node.cluster-root').length,11);const points=betaR.talentPoints(world.state),gold=world.state.silver;document.querySelector('[data-node=branch-sword]').click();assert.equal(document.getElementById('masteryContent').dataset.view,'branch');assert(document.querySelector('.destiny-node.specialization'));assert.equal(document.querySelectorAll('.destiny-node.cluster-root').length,1);document.querySelector('[aria-label="Усе дерево"]').click();assert.equal(document.getElementById('masteryContent').dataset.view,'overview');assert.equal(document.querySelectorAll('.destiny-node.cluster-root').length,11);assert.equal(betaR.talentPoints(world.state),points);assert.equal(world.state.silver,gold);
+ Object.assign(world.state,betaR.SPAWN);document.getElementById('inventoryAction').click();assert(document.getElementById('inventoryDialog').open);assert(document.querySelector('.pack-preview'));document.querySelector('[data-pack-tab=mounts]').click();assert.equal(document.querySelectorAll('.mount-preview').length,4);const mounts=new Set();for(const id of Object.keys(betaR.MOUNTS)){geometry=[];scene.mountModel({state:{x:500,y:500,selectedMount:id},facing:{x:0,y:1},walking:true,footstep:.5});mounts.add(JSON.stringify(geometry));}assert.equal(mounts.size,4);const oldCoins=world.state.silver;world.state.silver=20000;world.state.x=betaR.TRADERS.quartermaster.x;world.state.y=betaR.TRADERS.quartermaster.y;const bought=world.buyMount('donkey');assert(bought.ok,JSON.stringify({bought,xy:[world.state.x,world.state.y],v:betaR.VILLAGE,owned:world.state.mounts,near:world.nearCamp()}));assert.equal(world.state.silver,19650);assert(world.state.mounts.donkey);assert(new env.HoMoWFull.World(world.save()).state.mounts.donkey);world.state.silver=oldCoins;document.querySelector('[data-pack-tab=appearance]').click();assert.equal(document.querySelectorAll('.appearance-controls select').length,6);document.getElementById('closeInventory').click();document.getElementById('masteryAction').click();assert(document.getElementById('masteryDialog').open);assert(document.querySelector('.paths-header'));
+ const board=document.getElementById('masteryContent'),points=betaR.talentPoints(world.state),gold=world.state.silver;
+ assert.equal(board.dataset.view,'talents');assert(board.querySelector('[data-node=vitality]'));
+ assert(board.querySelector('[data-node=guard] .path-parent').textContent.includes('Міцність'));
+ const press=(parent,label)=>[...parent.querySelectorAll('button')].find(b=>b.textContent===label).click();
+ press(board,'Майстерство');assert.equal(board.dataset.view,'mastery');assert.equal(board.querySelectorAll('[data-variant]').length,3);
+ press(board,'Таланти');assert.equal(betaR.talentPoints(world.state),points);assert.equal(world.state.silver,gold);
+ world.state.level=8;document.getElementById('closeMastery').click();document.getElementById('masteryAction').click();
+ board.querySelector('[data-talent=vitality]').click();board.querySelector('[data-talent=guard]').click();
+ assert.equal(world.state.talents.guard,1);assert.equal(betaR.talentPoints(world.state),5);
+ document.getElementById('closeMastery').click();
+ const city=betaR.townTraders(betaR.CITY_LANDMARKS.inn),entry={x:7067,y:2590};
+ for(const place of [...Object.values(city),betaR.CITY_LANDMARKS.inn,betaR.CITY_LANDMARKS.hall]){
+   assert(!betaR.blocked(place.x,place.y,17));const walk=betaR.findPath(entry.x,entry.y,place.x,place.y);
+   assert(walk.length&&Math.hypot(walk.at(-1).x-place.x,walk.at(-1).y-place.y)<20);
+ }
+ for(const [slot,items] of Object.entries({variant:betaR.VARIANTS,armor:betaR.ARMOR_KINDS,outfit:betaR.OUTFITS,support:betaR.SUPPORTS,extra:betaR.EXTRAS})){
+   for(const kind of Object.keys(items)){
+     const sellers=Object.keys(city).filter(id=>betaR.traderStock(id,slot,kind));assert.equal(sellers.length,1,kind);
+     const owner=city[sellers[0]];assert(betaR.serviceAllowed({state:{...owner}},'buyGear',[slot,kind,false]),kind);
+   }
+ }
+ world.state.passUnlocked=true;Object.assign(world.state,{x:city.enchanter.x,y:city.enchanter.y});
+ document.getElementById('merchantAction').click();assert.equal(document.getElementById('merchantStock').dataset.trader,'enchanter');
+ world.state.silver=5000;world.state.bank.crystal=15;world.state.bank.mithril_ingot=10;
+ document.getElementById('closeMerchant').click();document.getElementById('merchantAction').click();
+ const enchant=document.querySelector('[data-enchant="variant:sword_broadsword"]');assert(enchant&&!enchant.disabled);enchant.click();
+ assert.equal(betaR.enchantLevel(world.state,'variant','sword_broadsword'),1);document.getElementById('closeMerchant').click();
+ Object.assign(world.state,betaR.CITY_LANDMARKS.inn);document.getElementById('merchantAction').click();
+ press(document.getElementById('expeditionDialog'),'Прив’язати відродження тут');assert.equal(world.state.homeTown,'city');
+ document.getElementById('expeditionDialog').close();
+
  for(const point of [{x:15,y:15},{x:betaR.WIDTH-15,y:15},{x:15,y:betaR.HEIGHT-15},{x:betaR.WIDTH-15,y:betaR.HEIGHT-15}]){Object.assign(world.state,point);scene.render(world);assert(scene.cx>=100&&scene.cx<=betaR.WIDTH-100);assert(scene.cz>=100&&scene.cz<=betaR.HEIGHT-100);}
  assert(!storage.has('brukivka_realms_v1'));const before=world.state.x;pending.shift()(1000);pending.shift()(4500);assert(storage.has('homow_beta_full_v1'));assert(!storage.has('brukivka_realms_v1'));
  const originalFlush=scene.flush;
@@ -260,4 +291,30 @@ test('tree models retain their species, scale, and a matching harvested stump',(
  const trees=Array.from({length:6},(_,i)=>bounds(i,true));
  assert(trees.every(b=>b.top>5*32&&b.top<22*32));assert(trees[1].width/trees[1].top>trees[2].width/trees[2].top*1.3);
  for(let i=0;i<trees.length;i++)assert(bounds(i,false).top<trees[i].top*.04);
+});
+
+test('hero experience migrates once, carries levels and releases the level-100 reserve once',()=>{
+ const beta=require('./core.js'),base=new R.World({level:42});
+ base.state.xp=Math.floor(R.xpGoal(base.state)*.4);base.state.talents.vitality=4;
+ const w=new World(base.save());assert.equal(w.state.level,42);
+ assert(Math.abs(w.state.xp/beta.xpGoal(w.state)-.4)<.002);assert.equal(w.state.talents.vitality,4);
+ assert.equal(beta.talentPoints(w.state),37);assert.equal(new World(w.save()).state.xp,w.state.xp);
+ const m=new World({level:99,passUnlocked:true}),left=beta.xpGoal(m.state)+321;
+ assert.equal(m.gainXp(left),left);assert.equal(m.state.level,100);assert.equal(m.state.reserveXp,321);
+ const restored=new World(m.save());const next=beta.xpGoal(restored.state);restored.gainXp(next);
+ Object.assign(restored.state,R.MONOLITH);assert(restored.interact().ok);assert.equal(restored.state.level,101);
+ assert.equal(restored.state.xp,321);assert.equal(restored.state.reserveXp,0);restored.interact();assert.equal(restored.state.xp,321);
+ const boss=beta.monsterXp({level:80},'pass_guardian');assert(boss>beta.monsterXp({level:80},'slime'));
+ const capped=new World({level:650,passUnlocked:true,monolithAwakened:true});assert.equal(capped.gainXp(1200),0);
+ const kill=new World();const foe=kill.monsters[0],before=kill.state.xp;kill.hitMonster(foe,1e8);
+ const event=kill.drainEvents().find(e=>e.type==='kill');assert(event.xp>0);assert.equal(kill.state.xp-before,event.xp);
+});
+test('a lawful town bind survives saves, death, recall and switching back to the village',()=>{
+ const w=new World({passUnlocked:true},()=>.99);Object.assign(w.state,R.CITY_LANDMARKS.inn);
+ assert(w.bindHome().ok);const h=new World(w.save(),()=>.99);assert.equal(h.state.homeTown,'city');
+ Object.assign(h.state,{x:3700,y:1700});h.damage(1e9);assert.equal(h.state.x,R.CITY_LANDMARKS.inn.x);
+ Object.assign(h.state,{x:3600,y:1600});h.lastCombat=-100;assert(h.beginRecall().ok);
+ for(let i=0;i<125;i++)h.update(.05,{});assert.equal(h.state.y,R.CITY_LANDMARKS.inn.y);
+ Object.assign(h.state,R.TRADERS.quartermaster);assert(h.bindHome().ok);assert.equal(h.state.homeTown,'village');
+ assert.equal(new World({homeTown:'city',passUnlocked:false}).state.homeTown,'village');
 });
