@@ -48,11 +48,12 @@ class Scene extends window.HoMoWBeta3D.Scene{
  const staticKey=this.cpu?[this.width,this.height,this.cx,this.cz,this.yaw,this.zoom,this.opt.shadows,this.opt.lowTextures,player.x,player.y,focusY,cluster,w.nodes.map(n=>n.charges).join(',')].join(':'):null;
  if(this.cpu&&staticKey===this.staticKey){this.faces=this.cachedFaces.slice();this.visible=this.cachedVisible;}else{
  this.horizon(w);this.clusterTransition(w);
- const biome=R.clusterAt(w.state.x,w.state.y).biome;this.draw('cube',area.x+area.w/2,-7,area.y+area.h/2,area.w,10,area.h,G.palette[biome].slice(1));if(!cluster.startsWith('dungeon:'))this.meadow(area,biome);this.villageGround(w);this.roads(w);this.frontiers(w);
+ const biome=R.clusterAt(w.state.x,w.state.y).biome;this.draw('cube',area.x+area.w/2,-7,area.y+area.h/2,area.w,10,area.h,G.palette[biome].slice(1));if(!cluster.startsWith('dungeon:'))this.meadow(area,biome);this.villageGround(w);this.roads(w);this.cityGround();this.frontiers(w);
  for(const o of R.OBSTACLES){const center={x:o.x+o.w/2,y:o.y+o.h/2};const tree=['pine','oak','birch'].includes(o.betaKind);
   if(tree?!this.tallVisible(center,685,190):!this.tallVisible(center,o.type==='house'?280:135,Math.max(o.w,o.h)))continue;
-  this.cover=o.type==='house'||o.type==='wall'||o.type==='citywall'||o.type==='mountain'||o.type==='dungeonwall';
+  this.cover=['hall','inn'].includes(o.type)||o.type==='house'||o.type==='wall'||o.type==='citywall'||o.type==='mountain'||o.type==='dungeonwall';
   if(o.betaKind)this.prop(o,w.time);
+  else if(['hall','inn','fountain'].includes(o.type))this.cityLandmark(o);
   else if(o.type==='house')this.building(o,w.time);
   else if(o.type==='water')this.pond(o);
   else if(['wall','citywall','dungeonwall'].includes(o.type)){
@@ -70,6 +71,7 @@ class Scene extends window.HoMoWBeta3D.Scene{
  if(this.cpu){this.staticKey=staticKey;this.cachedFaces=this.faces.slice();this.cachedVisible=this.visible;}}
  for(const n of w.nodes)if(show(n)&&Math.hypot(n.x-w.state.x,n.y-w.state.y)<230)this.tag(R.NODE_TYPES[n.type].name,n.x,n.y,n.type.startsWith('wood')?(n.charges?65:19):42,n.charges/R.NODE_TYPES[n.type].charges);
  for(const n of Object.values(R.townTraders(w.state)))if(show(n))this.tag(n.name+'\n'+(n.role||''),n.x,n.y,81,null);
+ for(const [id,p] of Object.entries(R.CITY_LANDMARKS))if(show(p)&&id!=='fountain')this.tag(id==='inn'?'Заїзд · відродження':'Ратуша · контракти',p.x,p.y,94,null);
  for(const [i,n]of R.GUARDS.entries())if(show(n))this.guard(n,w.time,i);
  this.villageLife(w);
 

@@ -13,7 +13,7 @@ for(const p of [D.VILLAGE.gate,...D.VILLAGE.exits])spread(p);D.VILLAGE.w*=sx;D.V
 // Old wilderness ponds must not cut the newly expanded streets.
 for(const o of D.OBSTACLES)if(!o.owner&&!o.betaKind&&o.type!=='wall'&&D.inVillage(o.x+o.w/2,o.y+o.h/2)){o.x=1400;o.y=1120;}
 for(const spawn of D.SPAWNS)if(D.inVillage(spawn[1],spawn[2])){spawn[1]=1330+(D.SPAWNS.indexOf(spawn)%3)*120;spawn[2]=1080+(D.SPAWNS.indexOf(spawn)%5)*95;}
-const services={blacksmith:['Коваль','Зброя · ремонт'],mage:['Маг','Посохи · магія'],enchanter:['Майстер рун','Зачарування'],armorer:['Бронник','Броня · щити'],alchemist:['Алхімік','Зілля · лікування'],artificer:['Ремісник','Інструменти · ремесло'],quartermaster:['Інтендант','Скакуни · припаси'],market:['Торговець','Купівля · продаж']};for(const [id,[name,role]]of Object.entries(services))Object.assign(D.TRADERS[id],{name,role});
+const services={blacksmith:['Коваль','Зброя · інструменти'],mage:['Маг','Посохи · магія'],enchanter:['Зачарування','Майстер рун'],armorer:['Бронник','Броня · щити'],alchemist:['Алхімік','Зілля · лікування'],artificer:['Ремісник','Сумки · матеріали'],quartermaster:['Інтендант','Сховище · відродження'],market:['Торговець','Купівля · продаж']};for(const [id,[name,role]]of Object.entries(services))Object.assign(D.TRADERS[id],{name,role});
 window.HoMoWVillage={layout,props:props.length,spread,services};
 // Sparse, reproducible scenery. Trunks and ruins have matching collision footprints.
 let seed=716243;const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
@@ -23,4 +23,23 @@ const clear=(x,y,r=22)=>!D.OBSTACLES.some(o=>x>o.x-r&&x<o.x+o.w+r&&y>o.y-r&&y<o.
 for(const n of D.NODES)if(D.inVillage(n.x,n.y)&&!clear(n.x,n.y))for(let i=0;i<80;i++){const x=105+(n.id*97+i*53)%790,y=120+(n.id*67+i*41)%700;if(clear(x,y)&&Object.values(D.TRADERS).every(t=>Math.hypot(t.x-x,t.y-y)>48)){Object.assign(n,{x,y});break;}}
 Object.assign(D.GUARDS[0],spread({x:923,y:430}));Object.assign(D.GUARDS[1],spread({x:923,y:575}));
 
+// The existing hall and inn interaction points are on their public front steps.
+D.OBSTACLES.push({x:7375,y:2360,w:130,h:96,type:'hall'});
+for(const x of [7315,7550])for(const y of [2230,2470,2710,2900]){
+  D.OBSTACLES.push({x:x-5,y:y-5,w:10,h:10,type:'rock',betaKind:'lantern'});
+}
+// Facing the two market lanes leaves the hall steps and west approach open.
+const villageTraders=D.TRADERS,cityTraders={};
+for(const h of D.CITY_HOUSES){
+  const west=h.x<D.CITY_LANDMARKS.hall.x;
+  cityTraders[h.owner]={...villageTraders[h.owner],x:west?7318:7550,y:h.y+144};
+}
+D.townTraders=s=>D.inCity(s.x,s.y)?cityTraders:villageTraders;
+// Use the transaction's own shop assignment for both the store and the forge.
+const catalogs={variant:D.VARIANTS,armor:D.ARMOR_KINDS,outfit:D.OUTFITS,support:D.SUPPORTS,extra:D.EXTRAS};
+D.traderStock=(id,slot,kind)=>Object.hasOwn(catalogs[slot]||{},kind)&&
+  window.BrukEvolution.serviceFor('buyGear',[slot,kind])===id;
+const serviceAllowed=D.serviceAllowed;
+D.serviceAllowed=(w,method,args=[])=>method==='craft'&&D.RECIPES[args[0]]?.potion
+  ?D.nearby(w.state,'alchemist'):serviceAllowed(w,method,args);
 })();

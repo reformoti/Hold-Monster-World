@@ -1,6 +1,39 @@
 /* Beta environment: buildings, collectible plants, geology and village life. */
 (()=>{'use strict';const S=window.HoMoWWorldStyle,G=window.HoMoWGeography,L=G.landscape,F=window.HoMoWForms;
 window.HoMoWEnvironment={
+ cityGround(){
+   const R=window.BrukRealms,c=R.CITY;
+   if(!this.tallVisible({x:c.x+c.w/2,y:c.y+c.h/2},160,Math.max(c.w,c.h)))return;
+   const slab=(x,z,w,d,color,h=.5)=>this.draw('cube',x,h,z,w,.7,d,color);
+   slab(7470,2600,850,950,'959a87');
+   for(const x of [7323,7548])slab(x,2598,47,928,'c3b698',1.1);
+   for(const z of [2330,2544,2745,2960])slab(7460,z,755,44,'bdaf91',1.2);
+   slab(7085,2571,50,108,'bdaf91',1.3); slab(7057,2600,108,45,'bdaf91',1.3);
+   slab(7440,2528,255,110,'b6ad96',1.5);
+   for(const x of [7372,7408,7444,7480,7516])for(const z of [2505,2534,2563])
+     slab(x,z,34,26,'c6bca2',2);
+   for(const [x,z] of [[7050,2500],[7050,2700],[7888,2500],[7888,2700]]){
+     this.cover=true;
+     this.draw('cube',x,62,z,42,124,42,'858e82');this.draw('roof',x,124,z,56,35,56,'536762');
+     this.draw('cube',x,107,z+22,15,28,2,'49695e');this.cover=false;
+   }
+ },
+ cityLandmark(o){
+   const x=o.x+o.w/2,z=o.y+o.h/2;
+   if(o.type==='fountain'){
+     this.draw('orb',x,9,z,65,10,44,'a6a79a');this.draw('orb',x,16,z,56,5,36,'719f9b');
+     this.draw('cube',x,34,z,12,38,12,'b7b59e');this.draw('orb',x,53,z,24,6,17,'9da79b');
+     this.draw('cone',x,54,z,6,19,6,'b5d6ca');return;
+   }
+   this.building({...o,owner:o.type},0);
+   if(o.type==='hall'){
+     this.draw('cube',x,128,z,38,68,36,'b4b09a');this.draw('roof',x,162,z,49,32,45,'566e66');
+     for(const dx of [-42,42]){this.draw('cube',x+dx,53,z+o.h/2+4,13,57,3,'537569');}
+   }else{
+     this.draw('cube',x+47,74,z+o.h/2+9,33,4,12,'705849');
+     this.draw('cube',x+58,59,z+o.h/2+10,16,24,5,'c19b61');
+   }
+ },
  meadow(area,biome){
    const tile=126,reach=this.spanX+this.spanY*1.68;
    const x0=Math.max(area.x,Math.floor((this.cx-reach)/tile)*tile),z0=Math.max(area.y,Math.floor((this.cz-reach)/tile)*tile);
