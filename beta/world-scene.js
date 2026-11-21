@@ -1,88 +1,17 @@
 /* Full canonical world presented in 3D. No game rules live in this renderer. */
 (()=>{'use strict';
-const R=window.BrukRealms,C=window.HoMoWCamera3D;
+const R=window.BrukRealms,C=window.HoMoWCamera3D,G=window.HoMoWGeography;
 class Scene extends window.HoMoWBeta3D.Scene{
  constructor(canvas){super(canvas);this.labels.forEach(el=>el.remove());this.damageLabels.forEach(el=>el.remove());this.labels=[];this.damageLabels=[];this.visible=0;this.motion=new window.HoMoWMotion.View();}
  setup(w){this.opt=window.HoMoWOptions.get();const r=this.input.getBoundingClientRect();this.width=r.width;this.height=r.height;this.visual=this.motion.sample(w,performance.now()/1000,R.clusterOf(w.state));const bounds=R.DUNGEONS.find(d=>'dungeon:'+d.id===R.clusterOf(w.state))?.arena||{x:0,y:0,w:R.WIDTH,h:R.HEIGHT},cx=Math.max(bounds.x+100,Math.min(bounds.x+bounds.w-100,this.visual.state.x)),cy=Math.max(bounds.y+100,Math.min(bounds.y+bounds.h-100,this.visual.state.y));this.camera=C.create(this.width,this.height,cx,cy,this.yaw,this.zoom);Object.assign(this,this.camera);const opt=window.HoMoWOptions.get(),dims=window.HoMoWOptions.dimensions(this.width,this.height,opt,devicePixelRatio||1);if(this.canvas.width!==dims.width)this.canvas.width=dims.width;if(this.canvas.height!==dims.height)this.canvas.height=dims.height;if(!this.cpu){const g=this.gl;g.viewport(0,0,this.canvas.width,this.canvas.height);g.uniform4f(this.u.camera,this.spanX,this.spanY,0,0);g.uniform2f(this.u.center,this.cx,this.cz);g.uniform2f(this.u.orbit,this.camera.c,this.camera.s);}}
  draw(kind,x,y,z,...args){if(kind==='sphere'&&args[1]===1&&this.opt?.shadows===false)return;if(kind==='sphere'&&this.opt?.lowTextures)kind='cube';return super.draw(kind,x,y+(this.heroLift||0),z,...args);}
  hero(w){const s=w.state;this.heroLift=0;if(s.mounted){this.heroLift=this.mountModel(w);}super.hero({...w,time:this.opt?.animations===false?0:w.time,walking:this.opt?.animations===false?false:w.walking,footstep:this.opt?.animations===false?0:w.footstep,gait:this.opt?.animations===false?0:w.gait,twoHanded:s.weaponVariant?!R.offhandActive(s):false});this.heroLift=0;}
- weapon(w,a,bob,pose){
- const s=w.state,f=s.weaponKind,v=R.VARIANTS[s.weaponVariant],length=v?.reach||1;
- const cs=Math.cos(a),sn=Math.sin(a);
- const part=(x,y,z,sx,sy,sz,color,kind='cube',material='steel',twist=0)=>{
-   const leftBlade=pose.paired&&x<0;
-   const hand=leftBlade||f==='bow'?pose.left:pose.right;
-   const turn=a+(leftBlade?-pose.yaw:pose.yaw),dx=x-(leftBlade?-1:1)*pose.origin.x,dz=z-pose.origin.z;
-   this.draw(kind,s.x+hand.x*cs+hand.z*sn+dx*Math.cos(turn)+dz*Math.sin(turn),
-     hand.y+bob+y-pose.origin.y,s.y-hand.x*sn+hand.z*cs-dx*Math.sin(turn)+dz*Math.cos(turn),
-     sx,sy,sz,color,turn+twist,material);
- };
- const id=s.weaponVariant;
- const tier=Math.max(0,s.variantArsenal?.[id]??0);
- const enchant=s.enchantments?.['variant:'+id]||0;
- const metal=tier>=9?'ebce90':tier>=5?'cbd9d8':'9caaaf';
- let socket=[20,34,40];
- if(f==='axe'){
-   part(20,34,22,5,5,60*length,'705c40','cube','wood');
-   const z=24+26*length;
-   part(30,34,z,20,8,16,metal,'blade');
-   if(id==='axe_greataxe')part(10,34,z,20,8,16,metal,'blade');
-   if(id==='axe_halberd')part(20,34,z,6,5,24,metal,'blade');
-   socket=[20,34,z];
- }
- if(f==='spear'){
-   const tip=30+47*length;
-   part(18,32,30,4,4,95*length,'7b6646','cube','wood');
-   part(18,32,tip,id==='spear_glaive'?17:8,6,id==='spear_pike'?32:22,metal,'blade');
-   if(id==='spear_glaive')part(26,32,tip+6,8,5,14,metal,'blade');
-   socket=[18,32,tip];
- }
- if(f==='daggers'){
-   for(const side of v?.hands===2?[-1,1]:[1]){
-     part(side*20,32,17,5,5,17,'826548','cube','leather');
-     if(id==='daggers_claws'){
-       part(side*20,32,21,14,5,10,metal);
-       for(const offset of [-5,0,5])part(side*20+offset,32,25,3,4,16,metal,'blade');
-     }else part(side*20,32,25,7,5,23,metal,'blade');
-   }
-   socket=[20,32,24];
- }
- if(f==='bow'){
-   const span=id==='bow_warbow'?26:id==='bow_crossbow'?16:21;
-   part(0,37,20,span*2,4,5,'826842','cube','wood');
-   for(const side of [-1,1]){
-     part(side*span,37,14,6,5,16,'a88a57','cube','wood');
-     part(side*span/2,37,6,span,1,1,'dbd5ad','cube',null);
-     if(id==='bow_warbow')part(side*span,37,21,7,7,8,metal);
-   }
-   if(id==='bow_crossbow')part(0,36,6,7,6,40,'796346','cube','wood');
-   else part(0,38,23,2,2,42,'dacdb0','cube','wood');
-   socket=[0,37,20];
- }
- if(f==='staff'){
-   const top=38+34*length;
-   part(19,38,6,5,68*length,5,'7a6853','cube','wood');
-   part(19,top,6,11,17,11,id==='staff_frost'?'9ed7e6':'e7af72',id==='staff_frost'?'cone':'sphere','rune');
-   if(id==='staff_greatfire')for(const side of [-1,1])part(19+side*7,top,6,5,19,5,metal,'cone');
-   socket=[19,top-8,6];
- }
- const [x,y,z]=socket;
- part(x,y,z,7+tier*.4,6,5,metal);
- for(let i=1;i<=Math.floor(tier/3);i++)part(x,y+i*1.5,z-i*3,8,4,2,metal);
- if(enchant){
-   const color=window.HoMoWBeta3D.runeColors[enchant];
-   part(x,y+3,z,4,3,6,color,'orb','rune');
-   window.HoMoWBeta3D.enchantEffect(enchant,w.time,(dx,dy,dz,sx,sy,sz,ink,kind,twist)=>
-     part(x+dx,y+dy,z+dz,sx,sy,sz,ink,kind,null,twist));
- }
- }
-
  trader(n,id,time){
   // Civilian silhouettes and profession tools, independent of player equipment.
   const palette={blacksmith:['665040','a58a63'],mage:['615a8e','b5a2cc'],enchanter:['3e7774','9bcfc2'],armorer:['5b6e7b','9cabb0'],alchemist:['526f49','b8c583'],artificer:['876e49','cfb887'],quartermaster:['525e66','c3b698'],market:['945e4b','dec185']};
   const [cloth,trim]=palette[id]||palette.market,bob=this.opt?.animations===false?0:Math.sin(time*1.8+n.x)*.35;
   const part=(x,y,z,sx,sy,sz,color,kind='cube')=>this.draw(kind,n.x+x,y+bob,n.y+z,sx,sy,sz,color);
-  if(this.opt?.shadows!==false)part(0,1,0,23,1,15,'53644d','sphere');
+  if(this.opt?.shadows!==false)part(0,1,0,23,1,15,'59614e','sphere');
   for(const x of [-7,7]){part(x,17,0,10,25,11,'535346');part(x,5,4,12,9,18,'463f35');}
   part(0,43,0,29,31,20,cloth);part(0,28,0,31,5,21,'584735');part(0,28,12,6,5,3,trim);
   for(const x of [-18,18]){part(x,44,0,8,25,10,cloth);part(x,29,3,8,8,9,'c6a17e');}
@@ -106,26 +35,27 @@ class Scene extends window.HoMoWBeta3D.Scene{
  const staticKey=this.cpu?[this.width,this.height,this.cx,this.cz,this.yaw,this.zoom,this.opt.shadows,this.opt.lowTextures,cluster,w.nodes.map(n=>n.charges).join(',')].join(':'):null;
  if(this.cpu&&staticKey===this.staticKey){this.faces=this.cachedFaces.slice();this.visible=this.cachedVisible;}else{
  this.horizon(w);this.clusterTransition(w);
- const biome=R.clusterAt(w.state.x,w.state.y).biome;this.draw('cube',area.x+area.w/2,-7,area.y+area.h/2,area.w,10,area.h,({plains:'8dc468',forest:'61a36d',swamp:'71a68b',winter:'c6e3e7'})[biome]);this.villageGround(w);this.roads(w);this.frontiers(w);
+ const biome=R.clusterAt(w.state.x,w.state.y).biome;this.draw('cube',area.x+area.w/2,-7,area.y+area.h/2,area.w,10,area.h,G.palette[biome].slice(1));if(!cluster.startsWith('dungeon:'))this.meadow(area,biome);this.villageGround(w);this.roads(w);this.frontiers(w);
  for(const o of R.OBSTACLES){const center={x:o.x+o.w/2,y:o.y+o.h/2};if(!this.visibleAt(center,Math.max(o.w,o.h)))continue;
   if(o.betaKind)this.prop(o,w.time);
   else if(o.type==='house')this.building(o,w.time);
-  else if(o.type==='water'){this.draw('cube',center.x,-1,center.y,o.w,1,o.h,'54bbce');if(this.opt?.animations!==false)for(let i=0;i<3;i++)this.draw('cube',center.x+Math.sin(w.time*.5+i)*o.w*.18,1,center.y+(i-1)*o.h*.2,o.w*.25,1,2,'b7eeee');}
-  else if(o.type==='wall')this.draw('cube',center.x,23,center.y,o.w,46,o.h,'c1c5ad');
-  else this.draw('sphere',center.x,22,center.y,o.w/2,38,o.h/2,'9aafa3');this.visible++;
+  else if(o.type==='water')this.pond(o);
+  else if(o.type==='wall')this.draw('cube',center.x,23,center.y,o.w,46,o.h,'939582');
+  else this.draw('sphere',center.x,22,center.y,o.w/2,38,o.h/2,G.landscape.rock);this.visible++;
  }
  for(const n of w.nodes){if(!show(n))continue;this.visible++;this.resource(n,w.time);}
  for(const [id,n]of Object.entries(R.townTraders(w.state))){if(!show(n))continue;this.trader(n,id,w.time);this.visible++;}
+ for(const o of R.DECOR){if(!show(o)||['grass','flower','flowers'].includes(o.kind))continue;if(o.kind==='stump')this.treeModel(o.x,o.y,1,1,false,R.clusterAt(o.x,o.y).biome,0);else if(o.kind==='ruin')this.prop({...o,w:30,h:20,betaKind:'ruin'},w.time);else this.draw('sphere',o.x,5,o.y,10,8,9,'929c88');}
  if(this.cpu){this.staticKey=staticKey;this.cachedFaces=this.faces.slice();this.cachedVisible=this.visible;}}
  for(const n of w.nodes)if(show(n)&&Math.hypot(n.x-w.state.x,n.y-w.state.y)<230)this.tag(R.NODE_TYPES[n.type].name,n.x,n.y,n.type.startsWith('wood')?110:55,n.charges/R.NODE_TYPES[n.type].charges);
  for(const n of Object.values(R.townTraders(w.state)))if(show(n))this.tag(n.name+'\n'+(n.role||''),n.x,n.y,120,null);
  for(const [i,n]of R.GUARDS.entries())if(show(n))this.guard(n,w.time,i);
  this.villageLife(w);
- for(const o of R.DECOR){if(!show(o)||['grass','flower','flowers'].includes(o.kind))continue;if(o.kind==='stump')this.treeModel(o.x,o.y,1,1,false,R.clusterAt(o.x,o.y).biome,0);else if(o.kind==='ruin')this.prop({...o,w:30,h:20,betaKind:'ruin'},w.time);else this.draw('sphere',o.x,5,o.y,10,8,9,'acb9a5');}
+
  if(!w.state.passUnlocked&&this.visibleAt({x:R.PASS.barrierX,y:R.PASS.y+R.PASS.h/2}))this.draw('cube',R.PASS.barrierX,45,R.PASS.y+R.PASS.h/2,20,90,R.PASS.h,'7a8475');
  const run=w.state.expeditions.run,dungeon=R.DUNGEONS.find(d=>d.id===run?.id);
  if(dungeon){for(const gate of dungeon.gates)if(run.stage<gate.stage)this.draw('cube',gate.x+gate.w/2,35,gate.y+gate.h/2,gate.w,70,gate.h,'899c9e');for(const [p,name]of [[dungeon.chest,'E · Скриня'],[dungeon.exit,'E · Вихід']]){this.draw('cube',p.x,15,p.y,32,30,25,'bba36c');this.tag(name,p.x,p.y,65);}}
- for(const p of R.PORTALS){if(![p.a,p.b].includes(cluster)||!this.visibleAt(p,200))continue;const vertical=p.axis==='x';for(const side of [-1,1])this.draw('cube',p.x+(vertical?0:side*62),43,p.y+(vertical?side*62:0),18,86,18,'a6b0a0');this.draw('cube',p.x,92,p.y,vertical?22:150,16,vertical?150:22,'cab981');for(const side of [-1,1])this.draw('cube',p.x+(vertical?side*70:0),0,p.y+(vertical?0:side*70),vertical?145:90,1,vertical?90:145,'d6c48c');const current=R.clusterOf(w.state),to=R.CLUSTERS.find(c=>c.id===(p.a===current?p.b:p.a));this.tag((to?.name||'Перехід')+'\nWASD · пройти / E',p.x,p.y,115,null);}
+ for(const p of R.PORTALS){if(![p.a,p.b].includes(cluster)||!this.visibleAt(p,200))continue;const vertical=p.axis==='x';for(const side of [-1,1])this.draw('cube',p.x+(vertical?0:side*62),43,p.y+(vertical?side*62:0),18,86,18,'a6b0a0');this.draw('cube',p.x,92,p.y,vertical?22:150,16,vertical?150:22,'cab981');for(const side of [-1,1])this.draw('cube',p.x+(vertical?side*70:0),0,p.y+(vertical?0:side*70),vertical?145:90,1,vertical?90:145,G.landscape.road);const current=R.clusterOf(w.state),to=R.CLUSTERS.find(c=>c.id===(p.a===current?p.b:p.a));this.tag((to?.name||'Перехід')+'\nWASD · пройти / E',p.x,p.y,115,null);}
  for(const d of R.DUNGEONS){const p=d.entry;if(p&&show(p)){this.draw('cone',p.x,1,p.y,65,90,60,'566873');this.tag(d.name,p.x,p.y,110);}}
  if(show(R.MONOLITH)){const p=R.MONOLITH;this.draw('cube',p.x,62,p.y,35,124,35,w.state.monolithAwakened?'7fc6ba':'74877b');this.tag('E · Моноліт',p.x,p.y,145);}
  if(show(R.BILLBOARD)){const p=R.BILLBOARD;this.draw('sphere',p.x,0,p.y,110,1,95,'d5c394');for(const dx of [-40,40])this.draw('cube',p.x+dx,37,p.y,7,74,7,'755a3d');this.draw('cube',p.x,56,p.y,90,43,8,'ad8a56');this.draw('roof',p.x,80,p.y,108,14,30,'4e797b');this.tag('E · Дошка пошани',p.x,p.y,85);}

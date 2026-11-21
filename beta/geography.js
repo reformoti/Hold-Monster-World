@@ -6,6 +6,8 @@ for(const [i,p]of V.exits.entries())D.PORTALS.push({id:'village-'+i,a:'village',
 const borders=[];for(const a of D.CLUSTERS.filter(c=>!c.safe))for(const b of D.CLUSTERS.filter(c=>!c.safe)){if(a.id>=b.id)continue;let vertical,start,end,fixed;if(a.x+a.w===b.x||b.x+b.w===a.x){vertical=true;fixed=Math.max(a.x,b.x);start=Math.max(a.y,b.y);end=Math.min(a.y+a.h,b.y+b.h);}else if(a.y+a.h===b.y||b.y+b.h===a.y){vertical=false;fixed=Math.max(a.y,b.y);start=Math.max(a.x,b.x);end=Math.min(a.x+a.w,b.x+b.w);}else continue;if(end<=start)continue;
 for(let d=start+45;d<end;d+=90){const x=vertical?fixed:d,y=vertical?d:fixed;if(D.PORTALS.some(p=>Math.hypot(p.x-x,p.y-y)<195))continue;const kind=a.biome==='winter'||b.biome==='winter'?'ridge':a.biome==='swamp'||b.biome==='swamp'?'water':'forest';borders.push({x,y,kind,seed:Math.floor(d),vertical});}}
 // Map and world consume the same palette and border positions.
-const palette={plains:'#91bd60',forest:'#327b59',swamp:'#4c9290',winter:'#c0dfe9'};for(const [id,color]of Object.entries(palette))D.BIOMES[id].color=color;
-window.HoMoWGeography={town,borders,palette,roads:new Map()};
+const palette={plains:'#949b7b',forest:'#8c9576',swamp:'#7d8975',winter:'#c7ccc0'};
+const landscape={road:'b3a68a',roadEdge:'928870',water:'759b94',shore:'586d5b',shallow:'698780',
+  ripple:'a0b2a1',rock:'818c80',pine:['354941','3c5146','46594b'],bark:'655b48'};for(const [id,color]of Object.entries(palette))D.BIOMES[id].color=color;
+window.HoMoWGeography={town,borders,palette,landscape,roads:new Map()};
 })();
