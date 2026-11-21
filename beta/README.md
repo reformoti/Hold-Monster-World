@@ -1,4 +1,4 @@
-# HoMoW · 3D-бета 0.8.0
+# HoMoW · 3D-бета 0.13.0
 
 Єдина сторінка бети: https://reformoti.github.io/Hold-Monster-World/beta/
 
@@ -67,3 +67,6 @@ All resource nodes and overworld monster camps are validated against obstacles, 
 
 ## 0.12.0 · 2026-11-20
 Redesigned progression constellation with path cards, category colors, progress tracks, curved connections and a readable inspector. Branch-focused view isolates its nodes; the toolbar returns to the overview. Talent costs, prerequisites, XP, training and saved progress remain canonical.
+
+## 0.13.0 · 2026-11-21
+Distinct geometry for all 18 weapon variants with tier ornamentation and eight enchantment effects.

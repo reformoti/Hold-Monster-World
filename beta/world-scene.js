@@ -8,12 +8,65 @@ class Scene extends window.HoMoWBeta3D.Scene{
  hero(w){const s=w.state;this.heroLift=0;if(s.mounted){this.heroLift=this.mountModel(w);}super.hero({...w,time:this.opt?.animations===false?0:w.time,walking:this.opt?.animations===false?false:w.walking,footstep:this.opt?.animations===false?0:w.footstep,gait:this.opt?.animations===false?0:w.gait,twoHanded:s.weaponVariant?!R.offhandActive(s):false});this.heroLift=0;}
  weapon(w,a,bob){const s=w.state,f=s.weaponKind,v=R.VARIANTS[s.weaponVariant],length=v?.reach||1,arc=w.swing>0?Math.sin((1-w.swing/.3)*Math.PI)*1.2:0,turn=a+arc;
  const part=(x,y,z,sx,sy,sz,color,kind='cube')=>this.draw(kind,s.x+x*Math.cos(turn)+z*Math.sin(turn),y+bob,s.y-x*Math.sin(turn)+z*Math.cos(turn),sx,sy,sz,color,turn);
- const metal=s.enchantments?.['variant:'+s.weaponVariant]?'d6c094':'b8cbcb';
- if(f==='axe'){part(20,34,22,5,5,60*length,'705c40');part(20,34,47*length,32,8,17,metal);}
- if(f==='spear'){part(18,32,30,4,4,95*length,'7b6646');part(18,32,80*length,10,7,22,metal,'blade');}
- if(f==='daggers'){for(const side of v?.hands===2?[-1,1]:[1]){part(side*20,32,18,4,5,15,'6b5844');part(side*20,32,25,7,5,23,metal,'blade');}}
- if(f==='bow'){part(0,37,20,36,4,5,'826842');for(const side of [-1,1]){part(side*20,37,14,6,5,20,'a88a57');part(side*10,37,4,23,1,1,'dbd5ad');}if(s.weaponVariant==='bow_crossbow')part(0,36,6,6,5,40,'796346');else part(0,38,23,2,2,42,'dacdb0');}
- if(f==='staff'){part(19,38,6,5,68*length,5,'7a6853');part(19,75*length,6,10,15,10,s.weaponVariant?.includes('frost')?'9ed7e6':'e7af72','sphere');}
+ const id=s.weaponVariant;
+ const tier=Math.max(0,s.variantArsenal?.[id]??0);
+ const enchant=s.enchantments?.['variant:'+id]||0;
+ const metal=tier>=9?'ebce90':tier>=5?'cbd9d8':'9caaaf';
+ let socket=[20,34,40];
+ if(f==='axe'){
+   part(20,34,22,5,5,60*length,'705c40');
+   const z=24+26*length;
+   part(30,34,z,20,8,16,metal,'blade');
+   if(id==='axe_greataxe')part(10,34,z,20,8,16,metal,'blade');
+   if(id==='axe_halberd')part(20,34,z,6,5,24,metal,'blade');
+   socket=[20,34,z];
+ }
+ if(f==='spear'){
+   const tip=30+47*length;
+   part(18,32,30,4,4,95*length,'7b6646');
+   part(18,32,tip,id==='spear_glaive'?17:8,6,id==='spear_pike'?32:22,metal,'blade');
+   if(id==='spear_glaive')part(26,32,tip+6,8,5,14,metal,'blade');
+   socket=[18,32,tip];
+ }
+ if(f==='daggers'){
+   for(const side of v?.hands===2?[-1,1]:[1]){
+     part(side*20,32,17,5,5,17,'6b5844');
+     if(id==='daggers_claws'){
+       part(side*20,32,21,14,5,10,metal);
+       for(const offset of [-5,0,5])part(side*20+offset,32,25,3,4,16,metal,'blade');
+     }else part(side*20,32,25,7,5,23,metal,'blade');
+   }
+   socket=[20,32,24];
+ }
+ if(f==='bow'){
+   const span=id==='bow_warbow'?26:id==='bow_crossbow'?16:21;
+   part(0,37,20,span*2,4,5,'826842');
+   for(const side of [-1,1]){
+     part(side*span,37,14,6,5,16,'a88a57');
+     part(side*span/2,37,6,span,1,1,'dbd5ad');
+     if(id==='bow_warbow')part(side*span,37,21,7,7,8,metal);
+   }
+   if(id==='bow_crossbow')part(0,36,6,7,6,40,'796346');
+   else part(0,38,23,2,2,42,'dacdb0');
+   socket=[0,37,20];
+ }
+ if(f==='staff'){
+   const top=38+34*length;
+   part(19,38,6,5,68*length,5,'7a6853');
+   part(19,top,6,11,17,11,id==='staff_frost'?'9ed7e6':'e7af72',id==='staff_frost'?'cone':'sphere');
+   if(id==='staff_greatfire')for(const side of [-1,1])part(19+side*7,top,6,5,19,5,metal,'cone');
+   socket=[19,top-8,6];
+ }
+ const [x,y,z]=socket;
+ part(x,y,z,7+tier*.4,6,5,metal);
+ for(let i=1;i<=Math.floor(tier/3);i++)part(x,y+i*1.5,z-i*3,8,4,2,metal);
+ if(enchant){
+   const color=window.HoMoWBeta3D.runeColors[enchant];
+   for(let i=0;i<enchant;i++){
+     const phase=w.time*2+i*2.4;
+     part(x+Math.cos(phase)*6,y+5+Math.sin(phase)*4,z+i*2,3,3,3,color,'sphere');
+   }
+ }
  }
 
  trader(n,id,time){

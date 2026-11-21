@@ -35,6 +35,23 @@ test('canonical full UI boots and renders all clusters with software 3D without 
  const modelSignatures=new Set();let geometry=[];const validatedDraw=scene.draw;scene.draw=(...args)=>{geometry.push(args);return validatedDraw(...args);};for(const type of Object.keys(betaR.TYPES)){geometry=[];scene.faces=[];scene.creature({type,x:500,y:500,facing:{x:0,y:1},walking:true,footstep:1,alive:true},1);assert(scene.faces.length>0,type);modelSignatures.add(JSON.stringify(geometry));}assert.equal(modelSignatures.size,Object.keys(betaR.TYPES).length,'distinct rendered mob models');
  for(const type of Object.keys(betaR.NODE_TYPES)){scene.faces=[];scene.resource({id:1,type,x:500,y:500,charges:3},1);assert(scene.faces.length>0,type);}
 
+ const silhouettes=new Set();
+ for(const [id,variant] of Object.entries(betaR.VARIANTS)){
+   const appearances=new Set();
+   for(const tier of [0,6,12]){
+     for(let enchant=0;enchant<=8;enchant++){
+       const state={...world.state,weaponKind:variant.family,weaponVariant:id,variantArsenal:{[id]:tier},enchantments:{['variant:'+id]:enchant}};
+       geometry=[];
+       scene.faces=[];
+       scene.hero({...world,state});
+       const signature=JSON.stringify(geometry);
+       appearances.add(signature);
+       if(!tier&&!enchant)silhouettes.add(signature);
+     }
+   }
+   assert.equal(appearances.size,27,id+' tier and enchant appearances');
+ }
+ assert.equal(silhouettes.size,18,'unique weapon models');
  for(const area of R.CLUSTERS){world.state.x=area.x+area.w/2;world.state.y=area.y+area.h/2;scene.render(world);assert(scene.visible>=0);assert(Number.isFinite(scene.camera.cx));}for(const id of Object.keys(R.VARIANTS)){world.state.weaponVariant=id;world.state.weaponKind=R.VARIANTS[id].family;scene.render(world);}for(const id of Object.keys(R.MOUNTS)){world.state.mounted=true;world.state.selectedMount=id;scene.render(world);}world.state.mounted=false;
  assert(env.HoMoWGeography.borders.length>50);for(const b of env.HoMoWGeography.borders)assert(betaR.PORTALS.every(p=>Math.hypot(p.x-b.x,p.y-b.y)>=195),'clear crossing');const trees=new Set();for(let i=0;i<12;i++){geometry=[];scene.treeModel(500,500,2,1,true,'forest',i);trees.add(JSON.stringify(geometry));}assert(trees.size>=6,'tree silhouettes and sizes');assert.equal(betaR.CLUSTERS.length,13);assert.equal(betaR.clusterOf(betaR.SPAWN),'village');assert.equal(betaR.PORTALS.filter(p=>p.village).length,4);
  for(const p of betaR.PORTALS.filter(p=>p.village)){for(const entering of [false,true]){world.lastCombat=-100;world.time=100;world.duelActive=false;const sign=p.axis==='x'?(p.x===betaR.VILLAGE.x?1:-1):(p.y===betaR.VILLAGE.y?1:-1);world.state.x=p.x+(p.axis==='x'?sign*(entering?-25:25):0);world.state.y=p.y+(p.axis==='y'?sign*(entering?-25:25):0);const result=world.crossCluster(p.id);assert(result.ok,p.id+':'+result.message);assert.equal(betaR.clusterOf(world.state),entering?'village':'c00');}}
@@ -43,7 +60,7 @@ test('canonical full UI boots and renders all clusters with software 3D without 
  assert(!storage.has('brukivka_realms_v1'));const before=world.state.x;pending.shift()(1000);pending.shift()(4500);assert(storage.has('homow_beta_full_v1'));assert(!storage.has('brukivka_realms_v1'));
 });
 
-test('beta uses Ukrainian even with an old foreign locale, without changing stable preferences',()=>{const O=require('./options.js');assert.equal(O.KEY,'homow_beta_options_v1');for(const locale of ['uk','en','de','pt'])assert.equal(O.normalize({locale}).locale,'uk');const html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');assert(html.includes('src="options.js?v=0.12.0"'));assert(!html.includes('src="../homow-options.js'));});
+test('beta uses Ukrainian even with an old foreign locale, without changing stable preferences',()=>{const O=require('./options.js');assert.equal(O.KEY,'homow_beta_options_v1');for(const locale of ['uk','en','de','pt'])assert.equal(O.normalize({locale}).locale,'uk');const html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');assert(html.includes('src="options.js?v=0.13.0"'));assert(!html.includes('src="../homow-options.js'));});
 
 test('a swing keeps its aim during movement and pointer changes',()=>{const w=new World();w.monsters=[];w.aimTarget={x:w.state.x,y:w.state.y-100};w.attack();const facing={...w.facing};w.aimTarget={x:w.state.x+100,y:w.state.y};w.update(.05,{x:1});assert.deepEqual(w.facing,facing);for(let i=0;i<8;i++)w.update(.05,{x:1});assert(w.facing.x>0);});
 

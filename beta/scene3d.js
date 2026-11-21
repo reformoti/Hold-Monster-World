@@ -57,11 +57,36 @@ class Scene{
  // Every sword component shares the hand pivot, including the guard and pommel.
  if((s.weaponKind||'sword')==='sword'){
  const progress=1-w.swing/.3,arc=w.swing>0?(-1.05+2.1*Math.sin(progress*Math.PI/2)):.12,turn=a+arc;
- const handX=s.x+18*Math.cos(a)+8*Math.sin(a),handZ=s.y-18*Math.sin(a)+8*Math.cos(a);
- const sword=(z,y,sx,sy,sz,col,kind='cube',x=0)=>this.draw(kind,handX+x*Math.cos(turn)+z*Math.sin(turn),y+bob,handZ-x*Math.sin(turn)+z*Math.cos(turn),sx,sy,sz,col,turn);
- sword(0,32,4,4,13,'574631');for(const z of [-4,0,4])sword(z,32,4.5,4.5,1,'b39a61');sword(-8,32,4,4,4,'d6bd7c','sphere');
- sword(8,32,19,5,4,'d4bd83');for(const x of [-9,9])sword(10,32,4,5,7,'b89e63','cube',x);
- sword(11,32,9,9,49,'d7e6e5','blade');sword(24,33.3,1.2,1,22,'f1f4e8');
+ const variant=s.weaponVariant||'sword_broadsword';
+ const tier=s.variantArsenal?.[variant]??0;
+ const enchant=s.enchantments?.['variant:'+variant]||0;
+ const dual=variant==='sword_dual', heavy=variant==='sword_claymore';
+ const trim=tier>=9?'ebc875':tier>=5?'c3b28c':'a89979';
+ for(const side of dual?[-1,1]:[1]){
+   const handX=s.x+side*18*Math.cos(a)+8*Math.sin(a);
+   const handZ=s.y-side*18*Math.sin(a)+8*Math.cos(a);
+   const angle=turn+(dual?side*.28:0);
+   const sword=(z,x,sx,sy,sz,col,kind='cube',lift=0)=>this.draw(kind,
+     handX+x*Math.cos(angle)+z*Math.sin(angle),32+bob+lift,
+     handZ-x*Math.sin(angle)+z*Math.cos(angle),sx,sy,sz,col,angle);
+   const length=(heavy?60:dual?35:48)+tier*.6;
+   const width=(heavy?12:dual?6:8)+tier*.15;
+   sword(0,0,4,4,heavy?21:13,'574631');
+   sword(heavy?-12:-8,0,5,5,5,trim,'sphere');
+   sword(8,0,heavy?25:dual?13:19,4,4,trim);
+   sword(10,0,width,7,length,'d7e6e5','blade');
+   for(let i=0;i<Math.floor(tier/3);i++){
+     for(const edge of [-1,1])sword(11+i*3,edge*(width/2+1),3,4,5,trim);
+   }
+   if(enchant){
+     const color=runeColors[enchant];
+     sword(19,0,2,2,13+enchant,color,'cube',3);
+     for(let i=0;i<enchant;i++){
+       const phase=w.time*2+i*2.4;
+       sword(13+i*length/11,Math.cos(phase)*5,2,2,2,color,'sphere',5+Math.sin(phase)*3);
+     }
+   }
+ }
  }else this.weapon?.(w,a,bob);
  if(s.appearance?.beard&&s.appearance.beard!=='none')part(0,look.beard==='full'?59:63,8,14,look.beard==='full'?13:4,5,hair);
  if(s.outfits?.head)part(0,81,0,24,7,23,s.outfits.head==='soldier_helm'?'a5b8b6':'526d58');
@@ -74,4 +99,5 @@ class Scene{
  tree(x,z,i){this.draw('cone',x+15,1,z+10,26,1,19,'59744f');this.draw('cube',x,25,z,12,50,12,'76644a');this.draw('cone',x,35,z,30,75+(i%3)*12,30,i%2?'3b6050':'526c48');this.draw('cone',x,63,z,23,62,23,i%2?'456e57':'607b52');}
  label(index,x,z,y,visible,health=1){const el=this.labels[index],p=this.project(x,z,y);el.style.display=visible?'block':'none';el.style.left=p.x+'px';el.style.top=p.y+'px';el.querySelector('b').style.width=Math.max(0,health)*100+'%';}
 }
-window.HoMoWBeta3D={Scene,meshData};})();
+ const runeColors=['','86df99','76cddd','76a5ff','ae91ff','eb8ad7','ff9973','ffce68','fff2b8'];
+window.HoMoWBeta3D={Scene,meshData,runeColors};})();
