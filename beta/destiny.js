@@ -1,105 +1,20 @@
-/* Talent paths show prerequisites in reading order. Mastery advances by playing. */
-((root)=>{
+(function(root,factory){if(typeof module==='object'&&module.exports)module.exports=factory(require('./realms-core'));else root.BrukDestiny=factory(root.BrukRealms);})(typeof window==='undefined'?globalThis:window,function(R){
 'use strict';
-const R=root.BrukRealms;
-const branches=['Вартовий','Дослідник','Ремісник'];
-const scope=['Бій і захист','Рух і збір','Ремесло та спорядження'];
-const practice={combat:['power','vitality','guard','precision','leech','weaponFlow'],gather:['agility','prospector','packmaster','quickstep','windrunner'],craft:['smith','alchemist','focusMastery'],travel:['endurance','evasion'],trade:['trader','balanced']};
-const sources={combat:'перемоги в бою',gather:'збір ресурсів',craft:'ремесло',travel:'відвідування нових регіонів',trade:'торгівля'};
-const sigils=['shield','boots','axe'];
-function tiers(branch){
-  const rows=[];
-  for(const [id,t] of Object.entries(R.TALENTS)){
-    if(t.branch!==branch)continue;
-    let depth=0,parent=t.parent;
-    while(parent){depth++;parent=R.TALENTS[parent].parent;}
-    (rows[depth]??=[]).push(id);
-  }
-  return rows;
-}
-function mount(root,world,api){
-  const el=(tag,cls,text)=>{
-    const item=document.createElement(tag);
-    if(cls)item.className=cls;
-    if(text!==undefined)item.textContent=text;
-    return item;
-  };
-  function button(label,run,cls){
-    const b=el('button',cls,label);b.type='button';b.onclick=run;return b;
-  }
-  function icon(kind){
-    const a=el('span','path-icon');a.setAttribute('aria-hidden','true');
-    a.innerHTML=window.BrukRealmsArt.icon(kind);return a;
-  }
-  let tab='talents',branch=0,master=world.state.weaponKind;
-  function progress(box,value,goal,max){
-    const bar=el('progress');bar.max=goal;bar.value=max?goal:value;
-    bar.setAttribute('aria-label','Досвід майстерності');box.append(bar,el('small','',max?'Максимальний ранг':value+' / '+goal+' XP'));
-  }
-  function option(container,label,active,run,kind){
-    const b=button(label,run,'path-choice');b.setAttribute('aria-pressed',String(active));
-    if(kind)b.prepend(icon(kind));container.append(b);return b;
-  }
-  function talentCard(id){
-    const s=world.state,t=R.TALENTS[id],offer=R.trainingOffer(s,id),rank=R.talent(s,id),card=el('article','path-card');
-    card.dataset.node=id;card.dataset.state=rank>=t.max?'max':offer.available?'ready':'waiting';
-    const title=el('h4','',t.name),value=el('b','path-rank',rank+' / '+t.max);
-    title.append(value);card.append(title,el('p','',t.description));
-    if(t.parent)card.append(el('small','path-parent',(R.talent(s,t.parent)>0?'✓ ':'↳ ')+'Потрібно: '+R.TALENTS[t.parent].name+' · ранг 1'));
-    const passive=s.fame[id].rank;
-    const action=Object.keys(practice).find(key=>practice[key].includes(id));
-    if(action){const info=el('details','path-practice');
-      info.append(el('summary','','За очки: '+s.talents[id]+' · за дії: '+passive),
-        el('small','','Практика: '+sources[action]+'. '+(passive===t.max?'Максимум.':s.fame[id].xp+' / '+R.fameGoal(passive)+' до рангу за дії.')));
-      card.append(info);}
-
-    const buy=button(rank>=t.max?'Вивчено':offer.available?'Вивчити +1 · 1 очко':!s.talents[id]&&t.parent&&!R.talent(s,t.parent)?'Гілка закрита':'Потрібне 1 очко',()=>api.train(id,1),'path-learn');
-    buy.dataset.talent=id;buy.disabled=!offer.available;card.append(buy);return card;
-  }
-  function renderTalents(body,nav){
-    branches.forEach((b,i)=>option(nav,b,i===branch,()=>{branch=i;refresh();},sigils[i]));
-    body.append(el('h3','',branches[branch]+' · '+scope[branch]));
-    for(const [i,ids] of tiers(branches[branch]).entries()){
-      const group=el('section','path-tier'),row=el('div','path-row');
-      group.append(el('h4','tier-title',['Основи','Розвиток','Спеціалізація'][i]||'Поглиблення'),row);
-      for(const id of ids)row.append(talentCard(id));
-      body.append(group);
-    }
-    const reset=button('Повернути витрачені очки · 250 срібла',api.respec,'path-reset');
-    reset.id='respecTalents';reset.disabled=!world.nearCamp()||world.state.silver<250||!R.talentSpent(world.state.talents);
-    reset.title='Доступно у поселенні. Ранги за дії зберігаються.';body.append(reset);
-  }
-  function renderMastery(body,nav){
-    const s=world.state,names={gathering:'Збір ресурсів',crafting:'Ремесло'};
-    for(const key of Object.keys(s.mastery))option(nav,R.FAMILIES[key]?.name||names[key],master===key,()=>{master=key;refresh();});
-    const family=R.FAMILIES[master],m=s.mastery[master],group=el('section','path-card');
-    group.append(el('h3','',(family?.name||names[master])+' · '+m.level+'/'+R.MAX_MASTERY),
-      el('p','',family?'Перемагай із цією родиною зброї. Ранг відкриває вищі тири.':master==='gathering'?'Завершуй збір ресурсів.':'Створюй предмети та переробляй матеріали.'));
-    progress(group,m.xp,R.masteryGoal(m.level),m.level===R.MAX_MASTERY);body.append(group);
-    if(!family)return;
-    const cards=el('div','path-row');body.append(el('h3','','Спеціалізації'),cards);
-    for(const v of Object.values(R.VARIANTS).filter(v=>v.family===master)){
-      const vm=s.variantMastery[v.id],card=el('article','path-card');card.dataset.variant=v.id;
-      card.append(icon(v.id),el('h4','',v.name),el('b','',vm.level+' / '+R.MAX_SPECIALIZATION),
-        el('p','',s.variantArsenal[v.id]<0?'Придбай цей варіант у майстра.':'Перемагай саме цією зброєю.'),
-        el('small','','За ранг: +0,6% шкоди варіанту, +0,3% родині.'));
-      progress(card,vm.xp,R.variantGoal(vm.level),vm.level===R.MAX_SPECIALIZATION);cards.append(card);
-    }
-  }
-  function refresh(){
-    const y=root.scrollTop,s=world.state,points=R.talentPoints(s);
-    root.replaceChildren();root.className='paths-book';root.dataset.view=tab;
-    const header=el('div','paths-header'),tabs=el('div','paths-tabs');
-    option(tabs,'Таланти',tab==='talents',()=>{tab='talents';refresh();});
-    option(tabs,'Майстерство',tab==='mastery',()=>{tab='mastery';refresh();});
-    const xp=s.level===650?'Найвищий рівень':s.level===100&&!s.monolithAwakened?'У резерві '+s.reserveXp+' XP · пробуди моноліт за перевалом':s.xp+' / '+R.xpGoal(s)+' XP';
-    header.append(el('strong','','Рівень '+s.level),el('span','',xp),el('b','',points+' оч. талантів'));root.append(header,tabs);
-    root.append(el('p','paths-intro',tab==='talents'?'Кожен рівень дає 1 очко. Обери гілку і вклади очко в ранг. Деякі ранги також дають за дії. Обидва способи відкривають наступні таланти.':'Майстерство зростає від дій. Обери зброю або професію, щоб побачити наступний ранг.'));
-    const nav=el('div','paths-nav'),body=el('div','paths-body');root.append(nav,body);
-    if(tab==='talents')renderTalents(body,nav);else renderMastery(body,nav);
-    root.scrollTop=y;
-  }
-  refresh();return {refresh};
-}
-root.BrukDestiny={mount};
-})(window);
+const icons={vitality:'shield',guard:'plate',leech:'daggers',agility:'boots',prospector:'pickaxe',trader:'bag',smith:'axe',alchemist:'potion',packmaster:'bag',power:'sword',precision:'bow',evasion:'boots',quickstep:'boots',armourTraining:'plate',fortitude:'shield'};
+function model(s){const size=1400,nodes=[],edges=[],clusters=[],center={x:700,y:700},point=(c,r,a)=>({x:c.x+Math.cos(a*Math.PI/180)*r,y:c.y+Math.sin(a*Math.PI/180)*r}),add=(n,parent,color,active)=>{nodes.push(n);if(parent)edges.push({from:parent,to:n.id,color,active});};add({id:'hero',kind:'hero',label:'Мандрівник',current:s.level,max:R.levelCap(s),icon:'cape',status:'learned',...center});const angles=[-158,-126,-94,-62,-30,2,130,162];Object.entries(s.mastery).forEach(([key,m],i)=>{const family=R.FAMILIES[key],name=family?.name||(key==='gathering'?'Збирач':'Ремісник'),color=i<6?'#d7ad58':'#79c4ad',anchor='branch-'+key,c=point(center,480,angles[i]);clusters.push({id:anchor,label:name,color,...c});add({id:anchor,cluster:anchor,clusterRoot:true,kind:'mastery',key,label:name,icon:family?key:key==='gathering'?'pickaxe':'axe',current:m.level,max:R.MAX_MASTERY,xp:m.xp,goal:R.masteryGoal(m.level),status:m.level===R.MAX_MASTERY?'learned':'available',color,...c},'hero',color,m.level>0);if(family)for(const v of Object.values(R.VARIANTS).filter(v=>v.family===key)){const vm=s.variantMastery[v.id],owned=s.variantArsenal[v.id]>=0;add({id:'variant-'+v.id,kind:'specialization',cluster:anchor,key:v.id,family:key,label:v.name,description:v.description,icon:v.id,current:vm.level,max:R.MAX_SPECIALIZATION,xp:vm.xp,goal:R.variantGoal(vm.level),status:!owned?'locked':vm.level===R.MAX_SPECIALIZATION?'learned':'available',color,...point(c,220,angles[i]+(v.index-1)*100)},anchor,color,owned);}});
+['Вартовий','Дослідник','Ремісник'].forEach((branch,i)=>{const anchor='talents-'+i,color=['#e1c079','#9dca78','#bf9ecf'][i],c=point(center,480,[36,68,100][i]),talents=Object.entries(R.TALENTS).filter(([,t])=>t.branch===branch),current=talents.reduce((a,[key])=>a+s.talents[key],0),max=talents.reduce((a,[,t])=>a+t.max,0);clusters.push({id:anchor,label:branch,color,...c});add({id:anchor,cluster:anchor,clusterRoot:true,kind:'branch',label:branch,icon:['shield','boots','focus'][i],current,max,status:current?'learned':'available',color,...c},'hero',color,true);talents.forEach(([key,t],index)=>{const offer=R.trainingOffer(s,key),current=s.talents[key];add({id:'talent-'+key,kind:'talent',cluster:anchor,key,label:t.name,description:t.description,parentName:t.parent?R.TALENTS[t.parent].name:null,icon:icons[key]||'focus',current,max:t.max,canTrain:offer.available,cost:offer.cost,status:current===t.max?'learned':offer.available?'available':current?'partial':'locked',color,...point(c,220,-90+index*360/talents.length)},t.parent?'talent-'+t.parent:anchor,color,current>0);});});return {size,nodes,edges,clusters};}
+function mount(root,world,api){const d=document,A=window.BrukRealmsArt,make=(tag,cls,text)=>{const e=d.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e;};let data=model(world.state),selected='hero',expanded=new Set(),scale=.4,pan={x:0,y:0},initialized=false,drag=null,moved=false,batch=1;
+root.replaceChildren();root.classList.add('destiny-compact');root.classList.add('destiny-beta');const toolbar=make('div','destiny-tools'),jump=make('select');jump.id='destinyJump';jump.setAttribute('aria-label','Перейти до гілки');const def=make('option','','Усі гілки');def.value='hero';jump.append(def);for(const c of data.clusters){const option=make('option','',c.label+(c.id.startsWith('talents')?' · таланти':''));option.value=c.id;jump.append(option);}toolbar.append(jump);const crumb=make('span','destiny-breadcrumb','Усі шляхи');toolbar.append(crumb);const shell=make('div','destiny-layout'),viewport=make('div','destiny-viewport'),stage=make('div','destiny-stage'),details=make('aside','destiny-detail');viewport.id='destinyViewport';stage.id='destinyStage';stage.style.width=data.size+'px';stage.style.height=data.size+'px';viewport.append(stage);shell.append(viewport,details);const summary=make('div','destiny-summary');summary.innerHTML='<div><small>ТВОЯ ІСТОРІЯ</small><strong>Обери свій шлях</strong></div><div class="destiny-summary-stats"><span>Рівень <b>'+world.state.level+'</b></span><span>Очки талантів <b>'+R.talentPoints(world.state)+'</b></span></div>';root.append(summary,toolbar,shell);const legend=make('div','destiny-map-legend');for(const [color,label] of [['gold','Бойові шляхи'],['teal','Професії'],['violet','Таланти']]){const item=make('span',color,label);legend.append(item);}viewport.append(legend);
+function transform(){stage.style.transform=`translate(${pan.x}px,${pan.y}px) scale(${scale})`;}
+function focusNode(id){const n=data.nodes.find(n=>n.id===id);if(!n)return;pan={x:viewport.clientWidth/2-n.x*scale,y:viewport.clientHeight/2-n.y*scale};transform();}
+function fit(){scale=Math.max(.18,Math.min(.85,Math.min((viewport.clientWidth||860)/1250,(viewport.clientHeight||650)/1200)));focusNode('hero');}
+function zoom(factor){const next=Math.max(.18,Math.min(1.5,scale*factor)),cx=viewport.clientWidth/2,cy=viewport.clientHeight/2;pan={x:cx-(cx-pan.x)*next/scale,y:cy-(cy-pan.y)*next/scale};scale=next;transform();}
+function choose(id){const n=data.nodes.find(n=>n.id===id);if(!n)return;selected=id;batch=1;if(n.clusterRoot){expanded=new Set([n.cluster]);scale=Math.max(.3,Math.min(1.1,Math.min(viewport.clientWidth||760,viewport.clientHeight||620)/660));draw();focusNode(n.id);}else draw();jump.value=n.cluster||'hero';}
+for(const [name,label,action] of [['−','Зменшити',()=>zoom(.8)],['+','Збільшити',()=>zoom(1.25)],['◎','Усе дерево',()=>{expanded.clear();selected='hero';jump.value='hero';draw();fit();}],['⌘','Згорнути гілки',()=>{expanded.clear();selected='hero';jump.value='hero';draw();fit();}]]){const b=make('button','',name);b.type='button';b.title=label;b.setAttribute('aria-label',label);b.addEventListener('click',action);toolbar.append(b);}const help=make('details','destiny-help');help.append(make('summary','','?'),make('p','','Натисни на картку шляху, щоб відкрити гілку. Ранги зібрані в одному вузлі. Коліщатко — масштаб, перетягування — рух.'));toolbar.append(help);
+function info(){const n=data.nodes.find(n=>n.id===selected)||data.nodes[0];details.replaceChildren();const art=make('div','destiny-detail-art');art.innerHTML=A.icon(n.icon);art.style.setProperty('--branch-color',n.color||'#ddc77c');details.append(art,make('small','',n.kind==='talent'?'ТАЛАНТ':n.kind==='mastery'?'МАЙСТЕРСТВО':'ШЛЯХ ДОЛІ'),make('h3','',n.label));if(n.kind==='talent'){const f=world.state.fame[n.key],box=make('div','fame-progress'),bar=make('progress');bar.max=R.fameGoal(f.rank);bar.value=f.xp;box.append(make('strong','','Слава · ранг '+f.rank+'/'+R.TALENTS[n.key].max),bar,make('small','',f.xp+'/'+R.fameGoal(f.rank)+' XP · зростає за дії'),make('small','','Сумарний бонус: '+R.talent(world.state,n.key)+' рангів. Очки нижче — додаткова прокачка.'));details.append(box);details.append(make('p','',n.description),make('strong','',`Ранг ${n.current} / ${n.max}`),make('small','',`Доступно очок: ${R.talentPoints(world.state)}`));if(n.parentName)details.append(make('p','destiny-muted','Потрібно: '+n.parentName));const presets=make('div','destiny-batches');for(const [count,label] of [[1,'+1'],[5,'+5'],[10,'+10'],['max','MAX']]){const b=make('button','',label);b.type='button';b.dataset.trainCount=String(count);b.setAttribute('aria-pressed',String(batch===count));b.disabled=!R.trainingOffer(world.state,n.key,count).available;b.onclick=()=>{batch=count;info();};presets.append(b);}details.append(presets);const label=make('label','destiny-quantity','Кількість рангів'),input=make('input');input.type='number';input.min='1';input.max=String(n.max-n.current);input.step='1';input.id='talentQuantity';input.setAttribute('aria-label','Кількість рангів');const offer=R.trainingOffer(world.state,n.key,batch);input.value=String(batch==='max'?offer.count:batch);input.disabled=n.current===n.max;label.append(input);details.append(label);const quote=make('p','destiny-quote'),buy=make('button','primary');buy.type='button';buy.dataset.talent=n.key;function update(){const o=R.trainingOffer(world.state,n.key,batch);quote.textContent=o.count?'Ранги '+n.current+' → '+o.next+' · '+o.cost+' оч.':o.reason;buy.textContent=n.current===n.max?'✓ Вивчено':o.count?'Вивчити +'+o.count+' · '+o.cost+' оч.':'Вивчити';buy.disabled=!o.available;buy.onclick=()=>{if(o.available)api.train(n.key,o.count);};if(o.reason&&o.count)quote.textContent+=' · '+o.reason;}input.oninput=()=>{batch=input.value===''?NaN:Number(input.value);for(const b of presets.children)b.setAttribute('aria-pressed',String(batch===Number(b.dataset.trainCount)));update();};details.append(quote,buy);update();}
+else if(n.kind==='mastery'||n.kind==='specialization'){details.append(make('strong','',`Рівень ${n.current} / ${n.max}`),make('p','',n.kind==='specialization'?n.description+' +0.6% шкоди цьому варіанту і +0.3% усьому типу зброї за рівень.':n.key==='gathering'?'Збирай ресурси, щоб відкрити наступний рівень.':n.key==='crafting'?'Переробляй ресурси та створюй спорядження.':'Перемагай ворогів із цією зброєю. Майстерство відкриває старші рівні снаряги.'));const p=make('progress');p.max=n.goal;p.value=n.xp;details.append(p,make('small','',n.current===n.max?'✓ Максимальний рівень':`${n.xp}/${n.goal} до наступного рівня`));}
+else details.append(make('p','','Відкрий шлях, щоб переглянути навички, їхні вимоги та доступні покращення.'),make('strong','',`Доступно очок: ${R.talentPoints(world.state)}`));if(n.clusterRoot){const close=make('button','','Згорнути гілку');close.type='button';close.onclick=()=>{expanded.delete(n.cluster);selected='hero';draw();fit();};details.append(close);}if(n.kind==='hero'){const guide=make('div','destiny-guide');guide.append(make('strong','','Твій розвиток'),make('p','','Майстерство зростає в бою та під час роботи. Таланти відкривають додаткові бонуси за очки.'),make('small','','Обери шлях на схемі або в списку вгорі.'));details.append(guide);}const reset=make('button','','Скинути таланти · 250 срібла');reset.id='respecTalents';reset.type='button';reset.disabled=!world.nearCamp()||world.state.silver<250||!R.talentSpent(world.state.talents);reset.onclick=api.respec;details.append(reset);}
+function draw(){stage.replaceChildren();const chosen=data.nodes.find(n=>n.id===selected);crumb.textContent=chosen?.cluster?data.clusters.find(c=>c.id===chosen.cluster)?.label||'Усі шляхи':'Усі шляхи';root.dataset.view=expanded.size?'branch':'overview';const visible=data.nodes.filter(n=>expanded.size?(n.clusterRoot&&expanded.has(n.cluster)||expanded.has(n.cluster)):n.kind==='hero'||n.clusterRoot),byId=new Map(visible.map(n=>[n.id,n])),ns='http://www.w3.org/2000/svg',svg=d.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 '+data.size+' '+data.size);svg.style.width=data.size+'px';svg.style.height=data.size+'px';svg.classList.add('destiny-lines');for(const c of data.clusters)if(expanded.has(c.id)){const circle=d.createElementNS(ns,'circle');for(const [key,value] of Object.entries({cx:c.x,cy:c.y,r:170,fill:c.color+'0a',stroke:c.color,'stroke-opacity':.25,'stroke-width':2}))circle.setAttribute(key,value);svg.append(circle);}for(const edge of data.edges){const a=byId.get(edge.from),b=byId.get(edge.to);if(!a||!b)continue;const line=d.createElementNS(ns,'path'),dx=b.x-a.x,dy=b.y-a.y;line.setAttribute('d',`M ${a.x} ${a.y} C ${a.x+dx*.45} ${a.y}, ${b.x} ${b.y-dy*.45}, ${b.x} ${b.y}`);line.setAttribute('fill','none');line.setAttribute('stroke',edge.color);line.setAttribute('stroke-width',edge.active?4:2);line.setAttribute('opacity',edge.active?.75:.22);line.setAttribute('class',edge.active?'path-active':'path-idle');svg.append(line);}stage.append(svg);for(const n of visible){const b=make('button','destiny-node '+n.kind+' '+n.status+(n.clusterRoot?' cluster-root':'')+(selected===n.id?' selected':''));b.type='button';b.dataset.node=n.id;b.style.left=n.x+'px';b.style.top=n.y+'px';b.style.setProperty('--branch-color',n.color||'#e8cf80');b.title=n.label+' · '+n.current+'/'+n.max+(n.kind==='talent'?' · слава '+world.state.fame[n.key].rank:'');b.setAttribute('aria-label',b.title);b.setAttribute('aria-pressed',String(selected===n.id));b.style.setProperty('--node-progress',Math.min(100,n.current/(n.max||1)*100)+'%');if(n.clusterRoot)b.dataset.group=n.kind==='branch'?'talents':n.key==='gathering'||n.key==='crafting'?'profession':'combat';if(n.clusterRoot)b.setAttribute('aria-expanded',String(expanded.has(n.cluster)));b.innerHTML=A.icon(n.icon);b.append(make('b','',n.kind==='talent'?R.talent(world.state,n.key)+'/'+n.max:n.current+'/'+n.max));if(n.clusterRoot||n.kind==='talent')b.append(make('span','',n.label));if(n.clusterRoot){const track=make('i','destiny-node-progress');track.append(make('i'));b.append(track);b.append(make('small','destiny-node-kind',n.kind==='branch'?'ТАЛАНТИ':n.key==='gathering'||n.key==='crafting'?'ПРОФЕСІЯ':'МАЙСТЕРСТВО'));}if(n.kind==='hero')b.append(make('span','hero-node-label','Мандрівник'));b.onclick=()=>{if(!moved)choose(n.id);};b.addEventListener('focus',()=>{if(b.matches(':focus-visible'))focusNode(n.id);});stage.append(b);}info();transform();}
+function refresh(){data=model(world.state);summary.querySelector('.destiny-summary-stats').innerHTML='<span>Рівень <b>'+world.state.level+'</b></span><span>Очки талантів <b>'+R.talentPoints(world.state)+'</b></span>';draw();}
+jump.onchange=()=>{if(jump.value==='hero'){selected='hero';expanded.clear();draw();fit();}else choose(jump.value);};viewport.addEventListener('wheel',e=>{e.preventDefault();zoom(e.deltaY<0?1.1:1/1.1);},{passive:false});viewport.addEventListener('pointerdown',e=>{if(e.button!==0)return;drag={id:e.pointerId,x:e.clientX,y:e.clientY,px:pan.x,py:pan.y};moved=false;});viewport.addEventListener('pointermove',e=>{if(!drag||e.pointerId!==drag.id)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.hypot(dx,dy)>5){moved=true;viewport.setPointerCapture(e.pointerId);pan={x:drag.px+dx,y:drag.py+dy};transform();}});const end=()=>{drag=null;setTimeout(()=>moved=false,0);};viewport.addEventListener('pointerup',end);viewport.addEventListener('pointercancel',end);new ResizeObserver(()=>{if(!initialized&&viewport.clientWidth){initialized=true;fit();}else transform();}).observe(viewport);refresh();fit();return {refresh};}
+return {model,mount};});
