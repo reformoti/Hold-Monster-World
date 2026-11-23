@@ -7,7 +7,7 @@ class Scene extends window.HoMoWBeta3D.Scene{
  draw(kind,x,y,z,...args){if(kind==='sphere'&&args[1]===1&&this.opt?.shadows===false)return;if(kind==='sphere'&&this.opt?.lowTextures)kind='orb';
  if(this.pickParts&&!(kind==='sphere'&&args[1]===1))this.pickParts.push([kind,x,y,z,args[0],args[1],args[2],args[4]||0]);
  return super.draw(kind,x,y+(this.heroLift||0),z,...args);}
- hero(w){const s=w.state;this.heroLift=0;if(s.mounted){this.heroLift=this.mountModel(w);}super.hero({...w,time:this.opt?.animations===false?0:w.time,walking:this.opt?.animations===false?false:w.walking,footstep:this.opt?.animations===false?0:w.footstep,gait:this.opt?.animations===false?0:w.gait,twoHanded:s.weaponVariant?!R.offhandActive(s):false});const labelHeight=this.heroLift+68;this.heroLift=0;return labelHeight;}
+ hero(w){const s=w.state;this.heroLift=0;if(s.mounted){this.heroLift=this.mountModel(w);}super.hero({...w,time:this.opt?.animations===false?0:w.time,walking:this.opt?.animations===false?false:w.walking,footstep:this.opt?.animations===false?0:w.footstep,gait:this.opt?.animations===false?0:w.gait,turnRate:this.opt?.animations===false?0:w.turnRate,twoHanded:s.weaponVariant?!R.offhandActive(s):false});const labelHeight=this.heroLift+68;this.heroLift=0;return labelHeight;}
  trader(n,id,time){
   // Civilian silhouettes and profession tools, independent of player equipment.
   const palette={blacksmith:['665040','a58a63'],mage:['615a8e','b5a2cc'],enchanter:['3e7774','9bcfc2'],armorer:['5b6e7b','9cabb0'],alchemist:['526f49','b8c583'],artificer:['876e49','cfb887'],quartermaster:['525e66','c3b698'],market:['945e4b','dec185']};
@@ -55,7 +55,7 @@ class Scene extends window.HoMoWBeta3D.Scene{
   if(o.betaKind)this.prop(o,w.time);
   else if(['hall','inn','fountain'].includes(o.type))this.cityLandmark(o);
   else if(o.type==='house')this.building(o,w.time);
-  else if(o.type==='water')this.pond(o);
+  else if(o.type==='water')this.pond(o,w.time);
   else if(['wall','citywall','dungeonwall'].includes(o.type)){
     const h=o.type==='wall'?68:o.type==='citywall'?105:82;this.draw('cube',center.x,h/2,center.y,o.w,h,o.h,'939582');
   }else if(o.type==='mountain'){
@@ -93,7 +93,7 @@ class Scene extends window.HoMoWBeta3D.Scene{
    this.tag((m.encounterSlot!==undefined?'◆ ':'')+t.name+' · '+(t.level||1),m.x,m.y,top+10,m.hp/t.hp,true);this.visible++;}
  for(const d of w.state.drops){if(show(d))this.draw('cube',d.x,7,d.y,15,14,15,'d2b36f');}
  for(const p of w.projectiles){if(show(p))this.draw('sphere',p.x,28,p.y,p.magic?7:3,p.magic?7:3,9,p.magic?'c8a6e5':'e8d9af');}
- const playerLabel=this.hero({...w,state:this.visual.state,facing:this.visual.facing,gait:this.visual.gait});this.combat({...w,effects:[]});for(const e of effects){if(!this.visibleAt(e))continue;if(e.type==='burst')this.ring(e.x,e.y,e.radius||80,'e0c78e');else if(['hit','damage','heal','gather'].includes(e.type))this.tag(e.type==='gather'?'+'+e.amount:(e.type==='heal'?'+':'')+(e.value||''),e.x,e.y,70+(1-e.life)*45,1,e.type==='damage');}this.tag((w.onlineName||'Мандрівник')+' · '+w.state.level,this.visual.state.x,this.visual.state.y,playerLabel,w.state.hp/R.maxHp(w.state));
+ const playerLabel=this.hero({...w,state:this.visual.state,facing:this.visual.facing,gait:this.visual.gait,turnRate:this.visual.rate});this.combat({...w,effects:[]});for(const e of effects){if(!this.visibleAt(e))continue;if(e.type==='burst')this.ring(e.x,e.y,e.radius||80,'e0c78e');else if(['hit','damage','heal','gather'].includes(e.type))this.tag(e.type==='gather'?'+'+e.amount:(e.type==='heal'?'+':'')+(e.value||''),e.x,e.y,70+(1-e.life)*45,1,e.type==='damage');}this.tag((w.onlineName||'Мандрівник')+' · '+w.state.level,this.visual.state.x,this.visual.state.y,playerLabel,w.state.hp/R.maxHp(w.state));
  for(let i=this.labelCount;i<this.labels.length;i++)this.labels[i].hidden=true;
  if(this.cpu)this.flush();
  }

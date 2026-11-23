@@ -2,11 +2,11 @@
 (()=>{'use strict';const S=window.HoMoWWorldStyle;
 window.HoMoWCreatureArt={
  creature(m,time){const R=window.BrukRealms,t=R.TYPES[m.type],v=S.mob(m.type),f=v.family,c=v.color,accent=v.accent;
- const scale=window.HoMoWScale.creature(v,t),angle=Math.atan2(m.facing?.x||0,m.facing?.y??1),ca=Math.cos(angle),sa=Math.sin(angle),walk=this.opt?.animations===false?0:m.walking?Math.sin((m.footstep||time*10)):0,bob=this.opt?.animations===false?0:Math.sin(time*2+v.seed%9)*.6;
+ const scale=window.HoMoWScale.creature(v,t),angle=Math.atan2(m.facing?.x||0,m.facing?.y??1),anim=this.opt?.animations===false?0:1,scan=anim*(m.walking||m.windup>0?0:Math.sin(time*.62+v.seed*1.3)*.085),ca=Math.cos(angle+scan),sa=Math.sin(angle+scan),breath=1+anim*Math.sin(time*1.9+v.seed%9)*.017,walk=anim?m.walking?Math.sin((m.footstep||time*10)):0:0,bob=anim*Math.sin(time*2+v.seed%9)*.85;
  let top=0;
  const p=(x,y,z,sx,sy,sz,col=c,kind='cube',turn=0)=>{
- top=Math.max(top,(y+bob+sy*(kind==='cube'?.5:1))*scale);
- this.draw(kind,m.x+(x*ca+z*sa)*scale,(y+bob)*scale,m.y+(-x*sa+z*ca)*scale,sx*scale,sy*scale,sz*scale,col,angle+turn);};
+ top=Math.max(top,(y+bob+sy*breath*(kind==='cube'?.5:1))*scale);
+ this.draw(kind,m.x+(x*ca+z*sa)*scale,(y+bob)*scale,m.y+(-x*sa+z*ca)*scale,sx*scale*breath,sy*scale*breath,sz*scale*breath,col,angle+scan+turn);};
  if(this.opt?.shadows!==false)p(0,1,0,23,1,20,'447a52','sphere');
  const eye=(x,y,z,color='f5d76e',size=3)=>{p(x,y,z,size,size,2,'233947');p(x,y,z+1,size*.5,size*.5,1,color);};
  const legs=(wide,length,height,color)=>{for(const x of [-wide,wide])for(const z of [-length,length]){const stride=walk*(x*z>0?1:-1)*3;p(x,height/2+Math.max(0,stride),z+stride,7,height,8,color);p(x,4,z+3+stride,9,6,12,color);}};

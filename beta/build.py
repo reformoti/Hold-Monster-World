@@ -4,7 +4,7 @@ import re
 import subprocess
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
-VERSION = '0.17.1'
+VERSION = '0.18.0'
 
 def replace_once(text, old, new):
     if text.count(old) != 1:
