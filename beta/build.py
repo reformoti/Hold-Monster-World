@@ -4,7 +4,7 @@ import re
 import subprocess
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
-VERSION = '0.19.0'
+VERSION = '0.20.0'
 
 def replace_once(text, old, new):
     if text.count(old) != 1:
@@ -24,10 +24,16 @@ def build():
     # Every canonical asset stays in its original directory, including CSS URLs.
     html = re.sub(r'(src|href)="(?!https?:|#)([^"\s]+)"', lambda m: m[1]+'="../'+m[2]+'"', html)
     html = re.sub(r'<script src="../(?:cloud-guard|achievement-events|homow-cloud|homow-online)\.js[^>]*></script>', '', html)
-    html = re.sub(r'(<script src="../realms-evolution\.js[^"]*"></script>)', r'\1<script src="village-data.js?v='+VERSION+'"></script><script src="resource-layout.js?v='+VERSION+'"></script><script src="geography.js?v='+VERSION+'"></script>', html)
+    html = re.sub(r'(<script src="../realms-evolution\.js[^"]*"></script>)', r'\1<script src="village-data.js?v='+VERSION+'"></script><script src="maze-data.js?v='+VERSION+'"></script><script src="resource-layout.js?v='+VERSION+'"></script><script src="geography.js?v='+VERSION+'"></script>', html)
     beta_core = core.replace("require('./realms-", "require('../realms-")
     beta_core = replace_once(beta_core, "  const RADIUS=", "  const P=typeof module==='object'&&module.exports?require('./progression.js'):window.HoMoWProgression;\n  const RADIUS=")
     beta_core = replace_once(beta_core, "rankCost=rank=>1+Math.floor(rank/2)", "rankCost=()=>1")
+    beta_core = replace_once(beta_core, "if(blocked(s.x,s.y)||personalBlocked(s,s.x,s.y)){s.x=SPAWN.x;s.y=SPAWN.y;}", """if(blocked(s.x,s.y)||personalBlocked(s,s.x,s.y)){
+const origin={x:s.x,y:s.y},cluster=D.clusterOf(origin);let found=false;
+outer:for(let radius=25;radius<=600;radius+=25)for(let i=0;i<32;i++){
+const x=origin.x+Math.cos(i*Math.PI/16)*radius,y=origin.y+Math.sin(i*Math.PI/16)*radius;
+if(D.clusterOf({x,y})===cluster&&!blocked(x,y)&&!personalBlocked(s,x,y)&&!X.blocked({expeditions:{run:raw.expeditions?.run}},x,y)){s.x=x;s.y=y;found=true;break outer;}}
+if(!found){s.x=SPAWN.x;s.y=SPAWN.y;}}""")
     beta_core = replace_once(beta_core, "xpGoal=s=>Math.max(45,Math.round(80*Math.pow(s.level,1.22)))", "xpGoal=P.goal")
     start = beta_core.index('  function monsterXp(')
     end = beta_core.index('  const monsterDamage', start)
@@ -177,6 +183,8 @@ const load=el('progress','pack-load');load.max=R.capacity(s);load.value=R.weight
     ui = ui.replace("else notice('Рух — WASD або стрілки. E — взаємодія поруч.');", "else{world.aimTarget=p;world.attack();}")
     # Aim on every left click, after non-combat interaction checks.
     ui = ui.replace("const target=world.monsters.filter", "world.aimTarget=p;const target=world.monsters.filter")
+    ui = replace_once(ui, "world.monsters.filter(m=>m.alive&&Math.hypot(m.x-p.x", "world.monsters.filter(m=>m.alive&&scene.canSee(m,0,true)&&Math.hypot(m.x-p.x")
+    ui = replace_once(ui, "node=world.nodes.find(n=>Math.hypot(n.x-p.x", "node=world.nodes.find(n=>scene.canSee(n,0,true)&&Math.hypot(n.x-p.x")
     # Apply camera-relative axes to the existing simulation (all collisions unchanged).
     ui = replace_once(ui, 'world.update(step,{x,y,attack:', 'world.update(step,{...window.HoMoWCamera3D.movement(x,y,scene.yaw),attack:')
     ui = replace_once(ui, "attack:keys.has('Space')", 'attack:false')

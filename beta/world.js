@@ -15,7 +15,7 @@ function pick(items, slot, stream) {
 class World extends R.World {
   constructor(saved, random=Math.random, wallClock=Date.now){
     super(saved,random);
-    if(R.blocked(this.state.x,this.state.y,18)){const origin={x:this.state.x,y:this.state.y};outer:for(let r=30;r<=360;r+=25)for(let i=0;i<16;i++){const x=origin.x+Math.cos(i*Math.PI/8)*r,y=origin.y+Math.sin(i*Math.PI/8)*r;if(!R.blocked(x,y,22)&&R.clusterOf({x,y})===R.clusterOf(origin)){this.state.x=x;this.state.y=y;break outer;}}}
+    if(R.blocked(this.state.x,this.state.y,18)){const origin={x:this.state.x,y:this.state.y};outer:for(let r=30;r<=360;r+=25)for(let i=0;i<16;i++){const x=origin.x+Math.cos(i*Math.PI/8)*r,y=origin.y+Math.sin(i*Math.PI/8)*r;if(!R.blocked(x,y,22)&&!this.blocked(x,y)&&R.clusterOf({x,y})===R.clusterOf(origin)){this.state.x=x;this.state.y=y;break outer;}}}
     this.wallClock = wallClock;
     this.encounter = null;
     this.syncEncounter(saved?.betaEncounter);
@@ -98,13 +98,32 @@ class World extends R.World {
     }
     return saved;
   }
-  moveEntity(entity,dx,dy,r){const L=typeof window!=='undefined'?window.HoMoWLayout:null;if(entity===this.state||!entity.type||!L)return super.moveEntity(entity,dx,dy,r);const radius=R.TYPES[entity.type].radius,cluster=R.clusterOf({x:entity.homeX,y:entity.homeY}),valid=p=>R.clusterOf(p)===cluster&&!R.inVillage(p.x,p.y)&&!R.inCity(p.x,p.y)&&L.free(p,radius+3)&&(entity.type==='pass_guardian'?p.x>R.PASS.x+radius&&p.x+radius<R.PASS.barrierX&&p.y>R.PASS.y+radius&&p.y<R.PASS.y+R.PASS.h-radius:L.gateFree(p,125))&&this.nodes.every(n=>Math.hypot(n.x-p.x,n.y-p.y)>radius+32);
+  moveEntity(entity,dx,dy,r){const L=typeof window!=='undefined'?window.HoMoWLayout:null;
+  if(entity===this.state){
+    const from=R.clusterOf(entity),x=entity.x,y=entity.y,run=entity.expeditions.run;
+    super.moveEntity(entity,dx,dy,r);
+    const to=R.clusterOf(entity),pass=R.PORTALS.find(p=>p.betaDungeon&&[p.a,p.b].includes(from)&&[p.a,p.b].includes(to));
+    if(from!==to&&pass&&(to===pass.a||!run?.completed||!run?.claimed)){
+      entity.x=x;entity.y=y;
+      if(this.time-(this.mazeNotice||-100)>3){this.mazeNotice=this.time;this.emit('notice',{message:to===pass.a?'До печери входять через її обеліск.':'Здолай хранителя й забери нагороду зі скрині перед виходом у лабіринт.'});}
+    }
+    return;
+  }
+  if(!entity.type||!L)return super.moveEntity(entity,dx,dy,r);const radius=R.TYPES[entity.type].radius,cluster=R.clusterOf({x:entity.homeX,y:entity.homeY}),valid=p=>R.clusterOf(p)===cluster&&!R.inVillage(p.x,p.y)&&!R.inCity(p.x,p.y)&&L.free(p,radius+3)&&(entity.type==='pass_guardian'?p.x>R.PASS.x+radius&&p.x+radius<R.PASS.barrierX&&p.y>R.PASS.y+radius&&p.y<R.PASS.y+R.PASS.h-radius:L.gateFree(p,125))&&this.nodes.every(n=>Math.hypot(n.x-p.x,n.y-p.y)>radius+32);
  const len=Math.hypot(dx,dy);if(!len)return;const clear=(vx,vy)=>{const count=Math.max(1,Math.ceil(Math.hypot(vx,vy)/10));for(let i=1;i<=count;i++)if(!valid({x:entity.x+vx*i/count,y:entity.y+vy*i/count}))return false;return true;};
  for(const turn of [0,.45,-.45,.9,-.9,1.35,-1.35]){const x=dx*Math.cos(turn)-dy*Math.sin(turn),y=dx*Math.sin(turn)+dy*Math.cos(turn);if(clear(x,y)){super.moveEntity(entity,x,y,radius);return;}}entity.walking=false;
  }
-  crossCluster(id){const p=R.PORTALS.find(p=>p.id===id);if(!p?.village)return super.crossCluster(id);const s=this.state,from=R.clusterOf(s);if(![p.a,p.b].includes(from)||Math.hypot(p.x-s.x,p.y-s.y)>135||this.inCombat()||this.duelActive)return {ok:false,message:'Підійди до брами поза боєм.'};const entering=from!=='village',v=R.VILLAGE,sign=p.axis==='x'?(p.x===v.x?1:-1):(p.y===v.y?1:-1),delta=sign*(entering?1:-1)*45,x=p.x+(p.axis==='x'?delta:0),y=p.y+(p.axis==='y'?delta:0);if(R.blocked(x,y,18))return {ok:false,message:'Прохід зайнятий.'};s.x=x;s.y=y;this.selected=null;this.selectedNode=null;this.gathering=null;this.recalling=null;this.projectiles=[];const to=R.clusterAt(x,y);this.emit('cluster',{id:to.id,name:to.name});return {ok:true,message:'Кластер: '+to.name};}
+  crossCluster(id){const p=R.PORTALS.find(p=>p.id===id);
+  if(p?.betaDungeon){
+    const s=this.state,run=s.expeditions.run;
+    if(R.clusterOf(s)!==p.a||Math.hypot(p.x-s.x,p.y-s.y)>135||!run?.completed||!run?.claimed||this.inCombat()||this.duelActive)return {ok:false,message:'Вихід у лабіринт відкриється після перемоги та отримання нагороди. До печери входять через обеліск.'};
+    const x=p.x+85,y=p.y;if(this.blocked(x,y))return {ok:false,message:'Прохід зайнятий.'};
+    Object.assign(s,{x,y});this.selected=null;this.selectedNode=null;this.gathering=null;this.recalling=null;this.projectiles=[];this.path=[];
+    return {ok:true,message:'Кам’яний лабіринт · західний вхід.'};
+  }
+  if(!p?.village)return super.crossCluster(id);const s=this.state,from=R.clusterOf(s);if(![p.a,p.b].includes(from)||Math.hypot(p.x-s.x,p.y-s.y)>135||this.inCombat()||this.duelActive)return {ok:false,message:'Підійди до брами поза боєм.'};const entering=from!=='village',v=R.VILLAGE,sign=p.axis==='x'?(p.x===v.x?1:-1):(p.y===v.y?1:-1),delta=sign*(entering?1:-1)*45,x=p.x+(p.axis==='x'?delta:0),y=p.y+(p.axis==='y'?delta:0);if(R.blocked(x,y,18))return {ok:false,message:'Прохід зайнятий.'};s.x=x;s.y=y;this.selected=null;this.selectedNode=null;this.gathering=null;this.recalling=null;this.projectiles=[];const to=R.clusterAt(x,y);this.emit('cluster',{id:to.id,name:to.name});return {ok:true,message:'Кластер: '+to.name};}
   aimPoint(range){const s=this.state,p=this.aimTarget||{x:s.x+this.facing.x*170,y:s.y+this.facing.y*170},dx=p.x-s.x,dy=p.y-s.y,len=Math.hypot(dx,dy)||1,f=Math.min(1,range/len);return {x:s.x+dx*f,y:s.y+dy*f};}
-  update(dt,input={}){this.syncEncounter();const facing=this.facing,locked=this.swing>0,s=this.state,x=s.x,y=s.y,phase=this.footstep;super.update(dt,input);if(locked&&this.swing>0)this.facing=facing;const distance=Math.hypot(s.x-x,s.y-y),teleport=distance>80;this.walking=!teleport&&distance>.005;this.footstep=teleport?0:phase+distance*(s.mounted?.055:.075);this.lastTravel=teleport?0:distance;}
+  update(dt,input={}){this.syncEncounter();const facing=this.facing,locked=this.swing>0,s=this.state,x=s.x,y=s.y,phase=this.footstep;super.update(dt,input);if(locked&&this.swing>0)this.facing=facing;const distance=Math.hypot(s.x-x,s.y-y),teleport=distance>80;this.walking=!teleport&&distance>.005;this.footstep=teleport?0:phase+distance*(s.mounted?.055:.16);this.lastTravel=teleport?0:distance;}
   faceAim(){const s=this.state;if(this.aimTarget){const dx=this.aimTarget.x-s.x,dy=this.aimTarget.y-s.y,len=Math.hypot(dx,dy);if(len>1)this.facing={x:dx/len,y:dy/len};}}
   closest(range){const list=super.closest(range);return this.manualArea?list:list.filter(m=>{const dx=m.x-this.state.x,dy=m.y-this.state.y,len=Math.hypot(dx,dy)||1;return (dx*this.facing.x+dy*this.facing.y)/len>=Math.cos(Math.PI/3);});}
   attack(){

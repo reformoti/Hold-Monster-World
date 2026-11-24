@@ -307,9 +307,61 @@ window.HoMoWEnvironment={
  },
  resource(n,time){const v=S.resource(n.type),x=n.x,z=n.y,alive=n.charges>0,t=v.tier,c=alive?v.color:'8e9383',p=(dx,y,dz,sx,sy,sz,col=c,k='cube',a=0)=>this.draw(k,x+dx,y,z+dz,sx,sy,sz,col,a);
  if(v.family==='wood'){this.treeModel(x,z,t,v.shape,alive,RBiome(n),n.id,time);return;}
- if(v.family==='fiber'||v.family==='herb'){if(!alive){p(0,2,0,14,4,14,'967d51');return;}for(let i=0;i<5;i++){const a=i*2.4,dx=Math.cos(a)*12,dz=Math.sin(a)*9;p(dx,13,dz,3,24,3,'748266');p(dx+4,15,dz,10,6,7,v.family==='herb'?'7e9479':'97a77b','sphere',a);p(dx-3,20,dz,8,7,7,c,'sphere');if(v.family==='herb'||t>3)p(dx,25,dz,3,4,3,v.family==='herb'?'c99e80':c,'sphere');}return;}
+ if(v.family==='fiber'){this.cotton(n,v,time);return;}
+ if(v.family==='herb'){if(!alive){p(0,2,0,14,4,14,'967d51');return;}for(let i=0;i<5;i++){const a=i*2.4,dx=Math.cos(a)*12,dz=Math.sin(a)*9;p(dx,13,dz,3,24,3,'748266');p(dx+4,15,dz,10,6,7,'7e9479','sphere',a);p(dx-3,20,dz,8,7,7,c,'sphere');p(dx,25,dz,3,4,3,'c99e80','sphere');}return;}
  if(v.family==='hide'){for(const side of [-1,1])p(side*18,27,0,3,54,3,'9e784c');p(0,53,0,42,4,4,'b38b57');p(0,27,0,27,30,3,alive?['b78256','ccb58b','9c745a','decc9b'][v.shape]:'8b8068');return;}
  this.deposit(n,v);
+ },
+ cotton(n,v,time=0){
+      const variant=S.hash(String(n.id))%6,alive=n.charges>0;
+   const parts=F.model('cotton/'+v.id+'/'+variant+'/'+(alive?'active':'dry'),b=>{
+     let seed=(v.seed^Math.imul(variant+1,2654435761))>>>0;
+     const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
+     const angle=variant*.61,tip=[Math.cos(angle)*1.5,alive?28+v.tier*.7:8,Math.sin(angle)*1.5];
+     b.beam(alive?'stem':'dry',[0,0,0],tip,alive?1.2:.8,alive?.55:.35,6);
+     if(!alive){
+       for(const side of [-1,1])b.beam('dry',[tip[0]*.6,4.5,tip[2]*.6],[side*3.5,7+random()*2,side*1.8],.4,.16,5);
+       return;
+     }
+     const leaf=(root,a,length)=>{
+       const c=Math.cos(a),s=Math.sin(a),width=length*.43;
+       const point=(u,w,lift=0)=>[root[0]+c*u*length-s*w*width,root[1]+u*2.8+lift,root[2]+s*u*length+c*w*width];
+       const outline=[[0,0],[.23,-.22],[.22,-.78],[.48,-.46],[.58,-1],[.78,-.38],[1,0],[.78,.38],[.58,1],[.48,.46],[.22,.78],[.23,.22]].map(([u,w])=>point(u,w));
+       const ridge=point(.48,0,1.3);
+       for(let j=0;j<outline.length;j++){
+         const k=(j+1)%outline.length;b.triangle('leaf',ridge,outline[k],outline[j]);b.triangle('leafShade',ridge,outline[j],outline[k]);
+       }
+       b.beam('vein',root,point(.91,0,.25),.18,.08,4);
+     };
+     const count=5+Math.floor((v.tier-1)/3);
+     for(let i=0;i<count;i++){
+       const a=angle+i*2.399+random()*.23,r=10+random()*5,top=20+(i%3)*4+v.tier*.6+random()*2;
+       const root=[tip[0]*.4,8+i*2.4,tip[2]*.4],boll=[Math.cos(a)*r,top,Math.sin(a)*r];
+       b.beam('stem',root,[boll[0],top-3,boll[2]],.65,.32,6);
+       const petiole=[boll[0]*.53,root[1]+3,boll[2]*.53],end=[petiole[0]+Math.cos(a+.8)*2,petiole[1]+1,petiole[2]+Math.sin(a+.8)*2];
+       b.beam('stem',petiole,end,.3,.2,5);leaf(end,a+.8,8+random()*3);
+       // Open, pointed brown carpel halves surround the exposed cotton, not a white ball.
+       for(let j=0;j<5;j++){
+         const q=a+j*Math.PI*2/5,c=Math.cos(q),s=Math.sin(q);
+         const base=[boll[0],top-5,boll[2]],left=[boll[0]+c*4-s*2,top-2,boll[2]+s*4+c*2],right=[boll[0]+c*4+s*2,top-2,boll[2]+s*4-c*2],tip=[boll[0]+c*6,top+1.5,boll[2]+s*6];
+         b.triangle('boll',base,left,right);b.triangle('boll',left,tip,right);
+         b.triangle('bollShade',base,right,left);b.triangle('bollShade',left,right,tip);
+       }
+       for(let tuft=0;tuft<4;tuft++){
+         const q=a+tuft*Math.PI/2,px=boll[0]+Math.cos(q)*2.5,pz=boll[2]+Math.sin(q)*2.5,py=top+random()*2,rx=3.3+random(),rz=3+random();
+         const radii=Array.from({length:7},()=>.8+random()*.35);
+         const rings=[[-3,.35],[0,1],[2.8,.85],[4.1,.24]].map(([dy,size],row)=>radii.map((r,j)=>{
+           const u=q+j*Math.PI*2/7;return [px+Math.cos(u)*rx*r*size+(row===2?.4:0),py+dy+(row===1?random()*.9:0),pz+Math.sin(u)*rz*r*size];
+         }));
+         b.loft(['cotton','cream','cotton','fiberTint','cream','cotton','cream'],rings);
+       }
+     }
+     leaf([0,9,0],angle+1.8,10);leaf([0,15,0],angle+4.1,9);
+   });
+   const wash=(base,tint,mix)=>base.match(/../g).map((h,i)=>Math.round(parseInt(h,16)*(1-mix)+parseInt(tint.slice(i*2,i*2+2),16)*mix).toString(16).padStart(2,'0')).join('');
+   const colors={stem:'795638',dry:'937654',boll:'8d613c',bollShade:'67472f',leaf:wash('55764c',v.color,.10),leafShade:'3f5c3b',vein:'8b9561',cotton:'f2eddd',cream:'fff9e9',fiberTint:wash('e9e2ce',v.color,.12)};
+   const phase=alive&&this.opt?.animations!==false?Math.sin(time*1.3+variant)*.012:0;
+   for(const {mesh,slot} of parts)this.draw(mesh,n.x,0,n.y,1,1,1,colors[slot],0,this.opt?.lowTextures?null:['stem','dry','boll','bollShade','vein'].includes(slot)?'wood':['cotton','cream','fiberTint'].includes(slot)?'plaster':'leather',phase*.3,phase);
  },
  deposit(n,v){
    const variant=S.hash(String(n.id))%6,alive=n.charges>0;

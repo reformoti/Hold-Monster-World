@@ -180,8 +180,8 @@ function draw(view,w){
  const s=w.state,R=window.BrukRealms,look=s.appearance||{},out=s.outfits||{};
  const bare=!!w.appearanceOnly,kind=bare?'body':s.armorKind||'plate';
  const yaw=Math.atan2(w.facing.x,w.facing.y),cs=Math.cos(yaw),sn=Math.sin(yaw);
- const gait=w.gait??(w.walking?1:0),step=Math.sin(w.footstep||0)*gait,lateral=Math.cos(w.footstep||0)*gait,time=w.time||0,idle=1-gait;
- const breath=Math.sin(time*1.5),bob=Math.abs(step)*1.55+idle*breath*.34,sway=lateral*.9+idle*Math.sin(time*.61)*.55,glance=Math.sin(time*.47)*idle,bank=Math.max(-1.5,Math.min(1.5,w.turnRate||0))*.13*gait;
+ const gait=w.gait??(w.walking?1:0),phase=w.footstep||0,step=Math.cos(phase)*gait,lateral=Math.sin(phase)*gait,time=w.time||0,idle=1-gait;
+ const breath=Math.sin(time*1.5),bob=(1-Math.cos(phase*2))*.65*gait+idle*breath*.34,sway=lateral*.75+idle*Math.sin(time*.61)*.55,glance=Math.sin(time*.47)*idle,bank=Math.max(-1.5,Math.min(1.5,w.turnRate||0))*.13*gait;
  const width=look.body==='slim'?.89:look.body==='broad'?1.13:1;
  const pick=(type,key,fallback)=>(R.APPEARANCE[type][key]||fallback).slice(1);
  const palette={skin:({light:'e5b8a2',warm:'d6a18a',bronze:'ab7960',dark:'77503e'})[look.skin]||'dcb197',hair:pick('hair',look.hair,'#513b32'),accent:pick('accent',look.accent,'#77826e'),
@@ -200,7 +200,7 @@ function draw(view,w){
  };
  if(!s.mounted&&view.opt?.shadows!==false)view.draw('orb',s.x,.2,s.y,21*unit,1,13.5*unit,'5a614e');
  const torsoKey='torso/'+kind;
- figure(torsoKey,b=>torso(b,kind),[sway*.22,0,0],[width,1+idle*breath*.016,1],step*.06,0,bank);
+ figure(torsoKey,b=>torso(b,kind),[sway*.22,0,0],[width,1+idle*breath*.016,1],step*.065,gait*.065,bank);
  const headgear=bare?'':out.head||'',headKey=['head',headgear,look.style||'short',look.beard||'none'].join('/');
  figure(headKey,b=>head(b,look,headgear),[sway*.3,breath*idle*.18,0],[1,1,1],-step*.04+glance*.17,Math.sin(time*.8)*idle*.05,bank*.5);
  if(!bare&&out.cloak){
@@ -213,12 +213,21 @@ function draw(view,w){
  }
  const feet=bare?'':out.feet||'';
  for(const d of [-1,1]){
-   const stride=step*d,shift=s.mounted?3.5:0,x=d*(6.75*width+shift)+sway*.32,z=d*1.8+stride*7.2,up=Math.max(0,stride)*5.4;
-   const foot=s.mounted?[d*19,4.5,-3]:[x+d*1.2,up,z],ankle=[foot[0],foot[1]+5.2,foot[2]-.65],knee=s.mounted?[d*20,20,9]:[x+.2*d,18.4+up*.48,z*.52+2.2],hip=[d*6.8*width,30.6,-.55];
+   const cycle=((phase+(d<0?Math.PI:0))%(Math.PI*2)+Math.PI*2)%(Math.PI*2)/(Math.PI*2),stance=.62;
+   const progress=cycle<stance?cycle/stance:(cycle-stance)/(1-stance),swing=cycle>=stance;
+   const stride=stance*Math.PI/(.16*unit),travel=swing?-Math.cos(progress*Math.PI):1-2*progress;
+   const lift=swing?Math.pow(Math.sin(progress*Math.PI),1.5)*7*gait:0;
+   const tilt=s.mounted?0:gait*(swing?-.20*Math.sin(progress*Math.PI):progress<.15?-.12*(1-progress/.15):progress>.82?.18*(progress-.82)/.18:0);
+   const foot=s.mounted?[d*19,4.5,-3]:[d*7.95*width+sway*.18,-bob+lift+Math.max(0,Math.sin(tilt)*11),d*1.8+travel*stride*gait];
+   const ankle=[foot[0],foot[1]+5.2*Math.cos(tilt)+.65*Math.sin(tilt),foot[2]+5.2*Math.sin(tilt)-.65*Math.cos(tilt)],hip=[d*6.8*width,30.6,-.55];
+   const delta=ankle.map((n,i)=>n-hip[i]),distance=Math.hypot(...delta),axis=delta.map(n=>n/distance);
+   const along=Math.max(-16,Math.min(16,(16*16-15.8*15.8+distance*distance)/(2*distance))),bend=Math.sqrt(Math.max(0,16*16-along*along));
+   const forward=[-axis[0]*axis[2],-axis[1]*axis[2],1-axis[2]*axis[2]],length=Math.hypot(...forward);
+   const knee=s.mounted?[d*20,20,9]:hip.map((n,i)=>n+axis[i]*along+forward[i]/length*bend);
    const key='leg/'+kind+'/'+feet+'/';
    limb(key+'thigh',b=>leg(b,kind,'thigh',feet),knee,hip);
    limb(key+'shin',b=>leg(b,kind,'shin',feet),ankle,knee);
-   figure(key+'foot',b=>leg(b,kind,'foot',feet),foot,[1,1,1],d*.13);
+   figure(key+'foot',b=>leg(b,kind,'foot',feet),foot,[1,1,1],d*.13,tilt);
  }
  const family=s.weaponKind||'sword',id=R.VARIANTS[s.weaponVariant]?s.weaponVariant:R.DEFAULT_VARIANTS[family]||'sword_broadsword';
  const paired=['sword_dual','daggers_pair','daggers_claws'].includes(id);
@@ -228,8 +237,8 @@ function draw(view,w){
  let pitch=(family==='spear'?.46:family==='sword'?.25:family==='daggers'?.40:.15)+strike*(family==='staff'?.35:.96);
  let lean=(family==='spear'?.33:family==='staff'?.25:.49)+(two?.12:0);
  let turn=(family==='bow'?0:.10)+Math.sin(progress*2*Math.PI)*(family==='axe'?.98:.51);
- let right=[(two&&!paired?6.5:18.2)*width,33.2+strike*4+breath*idle*.22,10.2-step*3.1+strike*7+glance*.5];
- let left=[-18.1*width+sway*.5,32.8+breath*idle*.3,7+step*3.1];
+ let right=[(two&&!paired?6.5:18.2)*width,33.2+strike*4+breath*idle*.22,10.2-step*5.2+strike*7+glance*.5];
+ let left=[-18.1*width+sway*.5,32.8+breath*idle*.3,7+step*5.2];
  const transformed=(p,axis,local,mirror=1)=>{
    const v=F.point(axis,mirror*local[0]*weaponScale,local[1]*weaponScale,local[2]*weaponScale);
    return p.map((n,i)=>n+v[i]);

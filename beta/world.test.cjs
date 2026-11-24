@@ -18,7 +18,7 @@ test('canonical full UI boots and renders all clusters with software 3D without 
  let oreSnapshot;for(const match of document.querySelectorAll('script[src]')){const src=match.getAttribute('src').split('?')[0],file=path.resolve(__dirname,src);if(src==='resource-layout.js')oreSnapshot=env.BrukRealmsData.NODES.map(n=>({id:n.id,type:n.type,cluster:env.BrukRealmsData.clusterOf(n)}));vm.runInContext(fs.readFileSync(file,'utf8'),context,{filename:file});}
  assert(env.HoMoWBetaRuntime);
  for(const kind of Object.keys(R.FAMILIES)){for(const skill of R.SKILL_CHOICES[kind]){const sample=new env.HoMoWFull.World();sample.state.weaponKind=kind;sample.state.weaponSkills[kind]=skill.id;sample.state.mana=100;sample.aimTarget={x:sample.state.x+90,y:sample.state.y};const enemy=sample.monsters[0];enemy.x=sample.state.x+65;enemy.y=sample.state.y;enemy.alive=true;assert(sample.skill().ok,kind+':'+skill.id);}}
- const {world,scene}=env.HoMoWBetaRuntime;assert.equal(world.monsters.filter(m=>m.encounterSlot===undefined).length,141);assert.equal(world.nodes.length,190);
+ const {world,scene}=env.HoMoWBetaRuntime;assert.equal(world.monsters.filter(m=>m.encounterSlot===undefined).length,141+env.HoMoWMaze.plainSpawns.length);assert.equal(world.nodes.length,190);
  const betaR=env.BrukRealms;
  assert.equal(oreSnapshot.length,world.nodes.length);for(const original of oreSnapshot){const n=world.nodes.find(n=>n.id===original.id);assert.equal(n.type,original.type);assert.equal(betaR.clusterOf(n),betaR.inVillage(n.x,n.y)?'village':original.cluster,'resource keeps region '+n.id);}
  {
@@ -47,7 +47,7 @@ test('canonical full UI boots and renders all clusters with software 3D without 
  }
  const ores=world.nodes.filter(n=>betaR.NODE_TYPES[n.type].tool==='pickaxe');for(const n of ores){assert(!betaR.inVillage(n.x,n.y)&&!betaR.inCity(n.x,n.y),'ore outside towns '+n.id);assert(!betaR.blocked(n.x,n.y,30),'ore clear '+n.id);assert(betaR.PORTALS.every(p=>Math.hypot(p.x-n.x,p.y-n.y)>150),'portal access '+n.id);}
 
- const L=env.HoMoWLayout;assert.equal(L.report.nodes,190);assert.equal(L.report.spawns,141);
+ const L=env.HoMoWLayout;assert.equal(L.report.nodes,190);assert.equal(L.report.spawns,141+env.HoMoWMaze.plainSpawns.length);
  assert(!betaR.blocked(betaR.BILLBOARD.x,betaR.BILLBOARD.y,85),'open billboard square');assert(betaR.findPath(betaR.CAMP.x,betaR.CAMP.y,betaR.BILLBOARD.x,betaR.BILLBOARD.y).length,'path to board');
  for(const n of world.nodes){assert(L.free(n,50),'clear resource '+n.id);if(!betaR.clusterOf(n).startsWith('dungeon:'))assert(L.roadFree(n,64),'resource off road '+n.id);assert(L.gateFree(n,180),'resource off gate '+n.id);}
  for(const m of world.monsters.filter(m=>!betaR.clusterOf(m).startsWith('dungeon:'))){const r=betaR.TYPES[m.type].radius;assert(L.free(m,r+20),'clear mob camp '+m.id);assert(!betaR.inVillage(m.x,m.y)&&!betaR.inCity(m.x,m.y));if(m.type!=='pass_guardian')assert(L.gateFree(m,235),'camp off gate '+m.id);assert(world.nodes.every(n=>Math.hypot(n.x-m.x,n.y-m.y)>r+85),'camp off resource '+m.id);}
@@ -179,6 +179,89 @@ test('Space no longer attacks and the attack HUD control is hidden',()=>{const j
 test('all canonical enemy and resource types have explicit, distinct visual identities',()=>{const S=require('./world-style.js');for(const id of Object.keys(R.TYPES))assert(S.mob(id).family);for(const id of Object.keys(R.NODE_TYPES))assert(S.resource(id).family);const ores=Object.keys(R.NODE_TYPES).filter(id=>id.startsWith('ore_t'));assert.equal(new Set(ores.map(id=>S.resource(id).color)).size,8);});
 
 test('walking stops its gait against a wall and steps follow travelled distance',()=>{const w=new World({x:130,y:220});w.monsters=[];for(let i=0;i<50;i++)w.update(.05,{x:1});const phase=w.footstep,x=w.state.x;for(let i=0;i<20;i++)w.update(.05,{x:1});assert.equal(w.state.x,x);assert.equal(w.walking,false);assert.equal(w.footstep,phase);const a=new World(),b=new World();a.monsters=b.monsters=[];for(let i=0;i<10;i++){a.update(.05,{x:1});b.update(.05,{x:1,y:1});}assert(Math.abs(a.footstep-b.footstep)<1e-8);});
+test('articulated walking plants stance feet, lifts the swing and preserves mounted poses',()=>{
+ const env={BrukRealms:R,HoMoWArmory:{get:()=>({parts:[],colors:{}})}};env.window=env;vm.createContext(env);
+ for(const file of ['faceted-meshes','world-scale','avatar'])vm.runInContext(fs.readFileSync(path.join(__dirname,file+'.js'),'utf8'),env);
+ const state=new World().state,calls=[],view={opt:{shadows:false},draw(...a){assert(a.slice(1,7).every(Number.isFinite),a[0]);calls.push(a);}};
+ const draw=(phase,travel=0,mounted=false)=>{calls.length=0;env.HoMoWAvatar.draw(view,{state:{...state,x:0,y:travel,mounted},appearanceOnly:true,facing:{x:0,y:1},gait:1,walking:true,footstep:phase,time:1});return calls.slice();};
+ const right=geometry=>geometry.find(a=>a[0].includes('/foot/')&&a[1]>0);
+ const first=right(draw(Math.PI*.2)),next=right(draw(Math.PI*.3,Math.PI*.1/.16));
+ assert(Math.abs(first[3]-next[3])<1e-8,'planted foot does not slide through the ground');
+ assert(Math.abs(first[2])<1e-8&&Math.abs(next[2])<1e-8,'body bounce does not lift the planted foot');
+ assert(right(draw(Math.PI*1.7))[2]>3,'swing foot clears the ground');
+ for(let i=0;i<64;i++)for(const a of draw(i*Math.PI/32).filter(a=>a[0].includes('/thigh/')))assert(Math.abs(a[5]-16*env.HoMoWScale.human)<1e-5,'constant upper-leg length');
+ const a=draw(0,0,true).filter(a=>a[0].includes('/foot/')),b=draw(2,0,true).filter(a=>a[0].includes('/foot/'));
+ assert.deepEqual(a.map(p=>[p[1],p[3]]),b.map(p=>[p[1],p[3]]));
+});
+
+test('body picking uses cached custom facets with yaw, pitch and lean and rejects hidden targets',()=>{
+ const {env}=creatureAnatomyHarness(),F=env.HoMoWForms;
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'body-pick.js'),'utf8'),env);
+ env.HoMoWBeta3D={meshData(){throw Error('custom facets must not use primitive geometry');}};
+ const [{mesh}]=F.model('pick-test',b=>b.triangle('shell',[-1,1,0],[1,1,0],[0,-1,0]));
+ const matrix=F.basis(.65,.4,.3),center=F.point(matrix,0,4,0),expected={x:100+center[0],y:200+center[2]},height=60+center[1];
+ const view={camera:{s:0,c:1,elevationCos:.8,elevationSin:.6},project:(x,z,h)=>({x,y:z*.6-h*.8}),pick:(x,y)=>({x,y:y/.6}),aimBodies:[{left:-Infinity,right:Infinity,top:-Infinity,bottom:Infinity,parts:[[mesh,100,60,200,15,12,8,.65,.4,.3]]}]};
+ const screen=view.project(expected.x,expected.y,height),picked=env.HoMoWBodyPick.pick(view,screen.x,screen.y);
+ assert(Math.hypot(picked.x-expected.x,picked.y-expected.y)<1e-8);
+ view.visibility={x:10,y:20};view.canSee=()=>false;
+ const hidden=env.HoMoWBodyPick.pick(view,screen.x,screen.y);assert.equal(hidden.x,10);assert.equal(hidden.y,20);
+});
+
+function betaMazeWorld(){
+ const env={console};env.window=env;vm.createContext(env);
+ for(const file of ['../realms-data','../realms-loadout','../realms-skills','../realms-bosses','../realms-expeditions','../realms-evolution','village-data','maze-data','resource-layout','geography','progression','core','layout','encounter-sites','world'])vm.runInContext(fs.readFileSync(path.join(__dirname,file+'.js'),'utf8'),env,{filename:file+'.js'});
+ return env;
+}
+
+test('beta maze migration retains blocked dungeon saves, purchased items and wave state',()=>{
+ const env=betaMazeWorld(),R=env.BrukRealms,d=R.DUNGEONS.find(d=>d.id==='cavern'),wall=R.OBSTACLES.find(o=>o.type==='dungeonwall'&&o.x>d.arena.x+40&&o.x+o.w<d.arena.x+d.arena.w-40&&o.y>d.arena.y+40&&o.y+o.h<d.arena.y+d.arena.h-40);
+ assert(wall);const initial=new env.HoMoWFull.World(),save=initial.save();
+ Object.assign(save,{x:wall.x+wall.w/2,y:wall.y+wall.h/2,silver:7788,level:10});
+ save.expeditions.run={id:d.id,stage:1,startedAt:Date.now()-1000,completed:false,bossCredit:false,claimed:false};save.expeditions.records.cavern.clears=3;save.mounts.horse=true;
+ const restored=new env.HoMoWFull.World(save),s=restored.state;
+ assert.equal(R.clusterOf(s),'dungeon:cavern');assert.equal(s.expeditions.run.id,d.id);assert.equal(s.expeditions.run.stage,1);assert.equal(s.expeditions.records.cavern.clears,3);assert.equal(s.silver,7788);assert(s.mounts.horse);assert(!restored.blocked(s.x,s.y));
+ assert(d.waves[1].every(id=>restored.monsters[id].alive));assert(d.waves[0].every(id=>!restored.monsters[id].alive));
+ assert.equal(new env.HoMoWFull.World(restored.save()).state.expeditions.run.stage,1);
+});
+
+test('cavern maze passage requires claiming once and continues into the adjacent cluster',()=>{
+ const env=betaMazeWorld(),R=env.BrukRealms,w=new env.HoMoWFull.World(),d=R.DUNGEONS.find(d=>d.id==='cavern'),exit=R.PORTALS.find(p=>p.betaDungeon);
+ w.state.level=10;Object.assign(w.state,d.entry);assert(w.enterDungeon(d.id).ok);
+ Object.assign(w.state,{x:exit.x-60,y:exit.y});assert(!w.crossCluster(exit.id).ok);
+ for(let stage=0;stage<3;stage++){for(const id of d.waves[stage])w.hitMonster(w.monsters[id],1e9);w.update(.01);}
+ assert(w.state.expeditions.run.completed);w.lastCombat=-100;Object.assign(w.state,d.chest);assert(w.claimDungeon().ok);
+ const silver=w.state.silver,clears=w.state.expeditions.records.cavern.clears;assert(!w.claimDungeon().ok);assert.equal(w.state.silver,silver);
+ Object.assign(w.state,{x:exit.x-60,y:exit.y});assert(w.crossCluster(exit.id).ok);w.update(.01);assert.equal(w.state.expeditions.run,null);assert.equal(w.state.expeditions.records.cavern.clears,clears);
+ const p=R.PORTALS.find(p=>p.id==='c10-c11');Object.assign(w.state,{x:p.x-60,y:p.y});w.lastCombat=-100;assert(w.crossCluster(p.id).ok);assert.equal(R.clusterOf(w.state),'c11');
+ w.keyboardOnly=true;Object.assign(w.state,{x:p.x-40,y:p.y});for(let i=0;i<10;i++)w.moveEntity(w.state,8,0);assert.equal(R.clusterOf(w.state),'c11');
+ Object.assign(w.state,{x:exit.x+60,y:exit.y});for(let i=0;i<15;i++)w.moveEntity(w.state,-8,0);assert.equal(R.clusterOf(w.state),'c10','walking back must not bypass paid/progression entry');
+});
+
+test('plain camps append stable beta IDs and their defeated state survives saves',()=>{
+ const env=betaMazeWorld(),R=env.BrukRealms,w=new env.HoMoWFull.World({},()=>.5,()=>120000),ids=env.HoMoWMaze.plainSpawns.map(m=>m.id);
+ assert.equal(ids.length,6);assert.equal(R.SPAWNS.length,147);
+ const m=w.monsters[ids[0]];Object.assign(w.state,{x:m.x-40,y:m.y});w.hitMonster(m,1e9);assert(!m.alive);
+ const saved=w.save(),restored=new env.HoMoWFull.World(saved,()=>.5,()=>120000);assert(!restored.monsters[m.id].alive);
+ for(const id of ids){assert.equal(restored.monsters[id].id,id);assert.equal(R.clusterOf(restored.monsters[id]),'c20');assert(env.HoMoWMaze.inPlain(restored.monsters[id]));}
+});
+
+test('pointer resource selection filters invisible candidates even when their hitbox overlaps visible ground',()=>{
+ const line=fs.readFileSync(path.join(__dirname,'client.js'),'utf8').split('\n').find(s=>s.includes("canvas.addEventListener('pointerdown',event=>")),selected=[],closed={open:()=>false};let handler;
+ const node={id:17,type:'ore_t1',x:1405,y:1725},world={state:{x:1000,y:1725},nodes:[node],monsters:[],nearCamp:()=>false,selectNode:id=>{selected.push(id);return {message:''};},attack(){}};
+ const env={canvas:{addEventListener:(_,fn)=>handler=fn,focus(){}},world,scene:{canSee:n=>Math.hypot(n.x-world.state.x,n.y-world.state.y)<=390},screenToWorld:()=>({x:1385,y:1710}),network:null,profile:closed,panels:closed,journey:closed,hudUI:closed,community:closed,partyUI:closed,expeditions:{...closed,targetAt:()=>false},R:{BILLBOARD:{x:5000,y:5000},TYPES:{}},notice(){}};
+ vm.runInNewContext(line,env);handler({button:0});assert.equal(selected.length,0);
+ node.x=1380;handler({button:0});assert.deepEqual(selected,[17]);
+});
+
+test('maze fog raster clips distant geometry and blends the viewing edge',()=>{
+ const env={HoMoWMaterials:{}};env.window=env;vm.createContext(env);vm.runInContext(fs.readFileSync(path.join(__dirname,'raster.js'),'utf8'),env);
+ const size=128,ctx={createImageData:(w,h)=>({data:new Uint8ClampedArray(w*h*4)}),putImageData(image){this.output=image.data;}},visibility={x:0,y:0,radius:80,start:50};
+ const pts=[[0,0],[size,0],[size,size],[0,size]].map(([x,y])=>({x,y,depth:1,wx:x,wz:0}));
+ const view={ctx,canvas:{width:size,height:size},width:size,height:size,visibility,faces:[{pts,rgb:[200,150,100],visibility}]};env.HoMoWRaster.flush(view);
+ const pixel=x=>Array.from(ctx.output.slice((64*size+x)*4,(64*size+x)*4+4));
+ assert.deepEqual(pixel(25),[200,150,100,255]);assert.deepEqual(pixel(100),[89,99,88,255]);assert(pixel(65)[0]<200&&pixel(65)[0]>89);
+});
+
 test('render motion eases turns without changing game state and snaps between clusters',()=>{const {View}=require('./motion.js'),v=new View(),w=new World();const saved=JSON.stringify(w.state),first=v.sample(w,0,'c00');w.facing={x:0,y:1};w.walking=true;const turn=v.sample(w,.05,'c00');assert(turn.turn<first.turn&&turn.turn>0);assert.equal(JSON.stringify(w.state),saved);w.state.x+=500;const snap=v.sample(w,.1,'c01');assert.equal(snap.state.x,w.state.x);w.swing=.2;w.facing={x:-1,y:0};const aimed=v.sample(w,.15,'c01');assert(Math.abs(aimed.facing.x+1)<1e-8);});
 
 test('wandering packs follow real ten-minute windows and expire in and out of combat', () => {
@@ -278,6 +361,16 @@ test('overlapping armor facets resolve per pixel in either draw order',()=>{
  const pixel=(x,y)=>Array.from(ctx.output.slice((y*8+x)*4,(y*8+x)*4+4));
  env.HoMoWRaster.flush(view,true);assert.deepEqual(pixel(1,1),[210,185,80,255]);assert.deepEqual(pixel(5,1),[240,20,15,255]);
  view.faces.reverse();env.HoMoWRaster.flush(view,true);assert.deepEqual(pixel(1,1),[210,185,80,255]);assert.deepEqual(pixel(5,1),[240,20,15,255]);
+});
+
+test('wide obstacle cutaway reveals surroundings without removing geometry behind the hero',()=>{
+ const env={HoMoWMaterials:{}};env.window=env;vm.createContext(env);vm.runInContext(fs.readFileSync(path.join(__dirname,'raster.js'),'utf8'),env);
+ const ctx={createImageData:(w,h)=>({data:new Uint8ClampedArray(w*h*4)}),putImageData(image){this.output=image.data;}},size=256;
+ const face=(rgb,depth,cutaway)=>({rgb,cutaway,pts:[[0,0],[size,0],[size,size],[0,size]].map(([x,y])=>({x,y,depth}))});
+ const cut={screenX:128,screenY:128,rx:34*2.4,ry:43*2.4,depth:0},view={ctx,canvas:{width:size,height:size},width:size,height:size,faces:[face([20,90,30],0),face([160,110,70],10,cut)]};
+ const pixel=(x,y)=>Array.from(ctx.output.slice((y*size+x)*4,(y*size+x)*4+4));
+ env.HoMoWRaster.flush(view,true);assert.deepEqual(pixel(188,128),[20,90,30,255]);assert.deepEqual(pixel(230,128),[160,110,70,255]);
+ view.faces[1].pts.forEach(p=>p.depth=4);env.HoMoWRaster.flush(view,true);assert.deepEqual(pixel(128,128),[160,110,70,255]);
 });
 
 test('tree models retain their species, scale, and a matching harvested stump',()=>{
@@ -405,6 +498,12 @@ test('desktop inventory and shops filter without changing slots and trade exact 
  const search=exchange.querySelector('input[type=search]');search.value='немає такого ресурсу';search.oninput();assert.equal(exchange.querySelector('.exchange-controls'),null);
 });
 
+test('inventory detail stays in normal flow below nonshrinking equipment and bag columns',()=>{
+ const css=fs.readFileSync(path.join(__dirname,'inventory.css'),'utf8'),rules=[...css.matchAll(/#inventoryDialog \.pack-detail\{([^}]+)\}/g)].map(m=>m[1]);
+ assert(rules.at(-1).includes('position:static'));assert(!rules.at(-1).includes('bottom:0'));
+ assert(css.includes('#inventoryDialog .pack-columns{grid-template-columns:340px minmax(0,1fr);gap:20px;flex:0 0 auto}'));
+});
+
 test('a lawful town bind survives saves, death, recall and switching back to the village',()=>{
  const w=new World({passUnlocked:true},()=>.99);Object.assign(w.state,R.CITY_LANDMARKS.inn);
  assert(w.bindHome().ok);const h=new World(w.save(),()=>.99);assert.equal(h.state.homeTown,'city');
@@ -413,4 +512,249 @@ test('a lawful town bind survives saves, death, recall and switching back to the
  for(let i=0;i<125;i++)h.update(.05,{});assert.equal(h.state.y,R.CITY_LANDMARKS.inn.y);
  Object.assign(h.state,R.TRADERS.quartermaster);assert(h.bindHome().ok);assert.equal(h.state.homeTown,'village');
  assert.equal(new World({homeTown:'city',passUnlocked:false}).state.homeTown,'village');
+});
+
+function cottonCivilianHarness(){
+ const env={BrukRealms:R,HoMoWGeography:{landscape:{}},HoMoWTrees:{draw(){}},HoMoWBeta3D:{Scene:class{}},HoMoWFull:{},HoMoWCreatureArt:{},HoMoWMountArt:{},Math:Object.create(Math)};
+ env.Math.random=()=>assert.fail('cotton/civilian rendering must not use frame randomness');env.window=env;vm.createContext(env);
+ for(const file of ['faceted-meshes','world-style','world-scale','world-art','world-scene'])vm.runInContext(fs.readFileSync(path.join(__dirname,file+'.js'),'utf8'),env,{filename:file+'.js'});
+ const calls=[],scene={...env.HoMoWEnvironment,opt:{animations:false,shadows:true,lowTextures:false},draw(...args){calls.push(args);}};
+ const capture=fn=>{calls.length=0;fn();return calls.slice();};
+ const signature=draws=>draws.map(a=>Buffer.from(env.HoMoWForms.meshes.get(a[0]).buffer).toString('base64')).join('|');
+ const validate=()=>{for(const [mesh,data] of env.HoMoWForms.meshes){
+   assert(data.length>=18&&data.length%18===0,mesh+' triangles');
+   for(let i=0;i<data.length;i+=6){assert(Array.from(data.slice(i,i+6)).every(Number.isFinite),mesh+' finite vertices/normals');assert(Math.abs(Math.hypot(data[i+3],data[i+4],data[i+5])-1)<1e-5,mesh+' unit normals');}
+ }};
+ return {env,scene,capture,signature,validate};
+}
+
+test('cotton fiber types use six deterministic cached leafy boll models and small dry stalks',()=>{
+ const {env,scene,capture,signature,validate}=cottonCivilianHarness(),F=env.HoMoWForms,types=['fiber',...Array.from({length:8},(_,i)=>'fiber_t'+(i+1))],tierModels=new Set();
+ for(const type of types){
+   const variants=new Set(),shapes=new Set();
+   for(let id=0;id<36;id++){
+     const n=Object.freeze({id,type,x:501,y:613,charges:3,tool:R.NODE_TYPES[type].tool,loot:R.NODE_TYPES[type].loot}),before=JSON.stringify(n);
+     const active=capture(()=>scene.resource(n,1));assert.equal(JSON.stringify(n),before);
+     assert(active.length<16&&active.length>5);assert(active.every(a=>a[0].startsWith('cotton/'+type+'/')&&a[1]===n.x&&a[3]===n.y));
+     for(const slot of ['stem','leaf','leafShade','boll','bollShade','cotton','cream','fiberTint'])assert(active.some(a=>a[0].endsWith('/'+slot)),type+' '+slot);
+     assert(active.some(a=>a[9]==='wood')&&active.some(a=>a[9]==='plaster')&&active.some(a=>a[9]==='leather'));
+     const key=active[0][0].slice(0,active[0][0].lastIndexOf('/')),parts=F.model(key,()=>assert.fail('cached cotton model rebuilt'));
+     variants.add(key);shapes.add(signature(active));if(id===0)tierModels.add(signature(active));
+     const size=F.meshes.size,again=capture(()=>scene.resource(n,99));assert.deepEqual(again,active);assert.equal(F.meshes.size,size);assert.equal(F.model(key,()=>assert.fail('cache miss')),parts);
+     const dryNode=Object.freeze({...n,charges:0}),dry=capture(()=>scene.resource(dryNode,12));assert.equal(dry.length,1);assert(dry[0][0].endsWith('/dry/dry'));assert.equal(dry[0][9],'wood');assert.equal(dryNode.charges,0);
+     const data=F.meshes.get(dry[0][0]);for(let j=0;j<data.length;j+=6){assert(data[j+1]>=-1&&data[j+1]<11);assert(Math.hypot(data[j],data[j+2])<6);}
+     assert.deepEqual(capture(()=>scene.resource(dryNode,999)),dry);
+     if(id===0){let triangles=0;for(const a of active){const data=F.meshes.get(a[0]);triangles+=data.length/18;for(let j=0;j<data.length;j+=6)assert(Math.hypot(data[j],data[j+2])<28,'cotton stays inside clearance');}assert(triangles<2200,'bounded cotton triangles');}
+   }
+   assert.equal(variants.size,6,type+' bounded seed variants');assert.equal(shapes.size,6,type+' actual shape variations');
+ }
+ assert.equal(tierModels.size,9,'fiber base and all tiers have distinct geometry');assert(F.meshes.size<=9*6*10,'bounded cotton mesh cache');validate();
+ const second=cottonCivilianHarness(),n={id:'cotton-string-seed',type:'fiber_t8',x:35,y:72,charges:2};
+ const a=capture(()=>scene.resource(n,2)),b=second.capture(()=>second.scene.resource(n,2));assert.deepEqual(a,b);assert.equal(signature(a),second.signature(b),'independent builds reproduce cotton geometry');
+});
+
+test('cotton animations and texture options preserve cached models and leave herbs unchanged',()=>{
+ const {env,scene,capture}=cottonCivilianHarness(),n=Object.freeze({id:8,type:'fiber_t4',x:200,y:300,charges:4});
+ const still=capture(()=>scene.resource(n,0)),size=env.HoMoWForms.meshes.size;
+ scene.opt.animations=true;const moving=capture(()=>scene.resource(n,2));assert(moving.some(a=>Math.abs(a[11])>0));assert.deepEqual(moving.map(a=>a[0]),still.map(a=>a[0]));assert.deepEqual(capture(()=>scene.resource(n,2)),moving);assert.equal(env.HoMoWForms.meshes.size,size);
+ scene.opt.lowTextures=true;const plain=capture(()=>scene.resource(n,2));assert(plain.every(a=>a[9]===null));assert.deepEqual(plain.map(a=>a[0]),still.map(a=>a[0]));
+ assert(capture(()=>scene.resource({...n,charges:0},2)).every(a=>a[10]===0&&a[11]===0),'depleted stalk never sways');
+ for(const charges of [3,0]){
+   const herb=Object.freeze({id:18,type:'herb',x:200,y:300,charges}),expected=[];
+   if(!charges)expected.push(['cube',200,2,300,14,4,14,'967d51',0]);
+   else for(let i=0;i<5;i++){const a=i*2.4,dx=Math.cos(a)*12,dz=Math.sin(a)*9;
+     expected.push(['cube',200+dx,13,300+dz,3,24,3,'748266',0],['sphere',200+dx+4,15,300+dz,10,6,7,'7e9479',a],['sphere',200+dx-3,20,300+dz,8,7,7,'90a386',0],['sphere',200+dx,25,300+dz,3,4,3,'c99e80',0]);
+   }
+   assert.deepEqual(capture(()=>scene.resource(herb,88)),expected,'original herb draw calls');
+ }
+});
+
+test('civilian traders have cached sculpted faces, limbs and eight distinct profession silhouettes',()=>{
+ const {env,scene,capture,signature,validate}=cottonCivilianHarness(),trader=env.HoMoWFull.Scene.prototype.trader,shapes=new Set();
+ scene.opt.shadows=false;
+ for(const id of ['blacksmith','mage','enchanter','armorer','alchemist','artificer','quartermaster','market']){
+   const n=Object.freeze({...R.TRADERS[id],x:510,y:620}),before=JSON.stringify(n),active=capture(()=>trader.call(scene,n,id,1));
+   assert.equal(JSON.stringify(n),before);assert(active.length<60);assert(active.every(a=>a[0].startsWith('civilian/'+id+'/')&&a[1]===n.x&&a[3]===n.y));
+   for(const slot of ['cloth','trousers','boots','skin','skinShade','eyes','eyeWhite','hair','mouth','trim'])assert(active.some(a=>a[0].endsWith('/'+slot)),id+' '+slot);
+   assert(active.every(a=>a.slice(4,7).every(s=>s===env.HoMoWScale.human)));assert(active.every(a=>a[10]===0&&a[11]===0));
+   if(['blacksmith','armorer','artificer'].includes(id))assert(active.some(a=>a[0].endsWith('/apron')));
+   assert(active.some(a=>a[9]==='leather'));shapes.add(signature(active));
+   const key='civilian/'+id,parts=env.HoMoWForms.model(key,()=>assert.fail('civilian cache miss')),size=env.HoMoWForms.meshes.size;
+   assert.deepEqual(capture(()=>trader.call(scene,n,id,123)),active);assert.equal(env.HoMoWForms.meshes.size,size);assert.equal(env.HoMoWForms.model(key,()=>assert.fail('civilian rebuilt')),parts);
+   const translated=capture(()=>trader.call(scene,{...n,x:700,y:900},id,1));assert.deepEqual(translated.map(a=>a[0]),active.map(a=>a[0]));assert(translated.every(a=>a[1]===700&&a[3]===900));
+   let triangles=0;for(const a of active)triangles+=env.HoMoWForms.meshes.get(a[0]).length/18;assert(triangles<2200,'bounded civilian triangles');
+ }
+ assert.equal(shapes.size,8,'professions differ in geometry, not just colors');assert(env.HoMoWForms.meshes.size<8*24);validate();
+ const second=cottonCivilianHarness();second.scene.opt.shadows=false;const n={x:510,y:620,name:'unchanged',role:'unchanged'};
+ const a=capture(()=>trader.call(scene,n,'artificer',3)),b=second.capture(()=>second.env.HoMoWFull.Scene.prototype.trader.call(second.scene,n,'artificer',3));assert.deepEqual(a,b);assert.equal(signature(a),second.signature(b));
+});
+
+test('civilian trader idle, shadow and low-texture options do not change identity or cache size',()=>{
+ const {env,scene,capture}=cottonCivilianHarness(),trader=env.HoMoWFull.Scene.prototype.trader,n=Object.freeze({id:'true-market',x:123,y:456,name:'seller',role:'market'}),before=JSON.stringify(n);
+ const still=capture(()=>trader.call(scene,n,'market',1));assert.equal(still.filter(a=>a[0]==='sphere').length,1);
+ const size=env.HoMoWForms.meshes.size;scene.opt.shadows=false;const unshadowed=capture(()=>trader.call(scene,n,'market',22));assert.deepEqual(unshadowed,still.filter(a=>a[0]!=='sphere'));
+ scene.opt.animations=true;const moving=capture(()=>trader.call(scene,n,'market',3));assert(moving.some(a=>Math.abs(a[10])+Math.abs(a[11])>0));assert(moving.every(a=>a.slice(1,7).every(Number.isFinite)));assert.deepEqual(moving.map(a=>a[0]),unshadowed.map(a=>a[0]));assert.deepEqual(capture(()=>trader.call(scene,n,'market',3)),moving);
+ scene.opt.lowTextures=true;assert(capture(()=>trader.call(scene,n,'market',3)).every(a=>a[9]===null));
+ scene.opt.animations=false;const market=capture(()=>trader.call(scene,n,'market',3)),fallback=capture(()=>trader.call(scene,n,'unknown-profession',100));assert.deepEqual(fallback,market);
+ assert.equal(env.HoMoWForms.meshes.size,size);assert.equal(JSON.stringify(n),before);
+});
+
+function creatureAnatomyHarness(){
+ const env={BrukRealms:R,Math:Object.create(Math)};env.Math.random=()=>assert.fail('creature geometry must be deterministic');env.window=env;vm.createContext(env);
+ for(const file of ['faceted-meshes','world-style','world-scale','creature-art'])vm.runInContext(fs.readFileSync(path.join(__dirname,file+'.js'),'utf8'),env,{filename:file+'.js'});
+ const calls=[],warnings=[],scene={...env.HoMoWCreatureArt,opt:{animations:false,shadows:false,lowTextures:false},draw(...args){calls.push(args);},warning(...args){warnings.push(args);}};
+ const capture=(m,time=1)=>{calls.length=0;warnings.length=0;const top=scene.creature(m,time);return {calls:calls.slice(),warnings:warnings.slice(),top};};
+ return {env,scene,capture};
+}
+
+test('creature anatomy covers every canonical monster with bounded cached faceted unit solids',()=>{
+ const {env,capture}=creatureAnatomyHarness(),signatures=new Map(),typesBefore=JSON.stringify(R.TYPES),forms=env.HoMoWForms;
+ for(const type of Object.keys(R.TYPES)){
+   const m=Object.freeze({id:'immutable-'+type,type,x:501,y:613,facing:Object.freeze({x:.6,y:.8}),walking:true,footstep:1,alive:true}),before=JSON.stringify(m),active=capture(m);
+   assert.equal(JSON.stringify(m),before);assert(active.top>0&&Number.isFinite(active.top),type+' top');
+   assert(active.calls.some(a=>a[0].startsWith('creature/')),type+' sculpted shells');assert(active.calls.length<90,type+' bounded draws');
+   assert(active.calls.every(a=>a.slice(1,7).every(Number.isFinite)&&a.slice(4,7).every(v=>v>0)),type+' positive dimensions');
+   assert(active.calls.every(a=>a.slice(10,12).every(Number.isFinite)),type+' rotations');const signature=JSON.stringify(active.calls);assert(!signatures.has(signature),type+' distinct from '+signatures.get(signature));signatures.set(signature,type);
+   let triangles=0;for(const a of active.calls){const data=forms.meshes.get(a[0]);if(data)triangles+=data.length/18;}
+   assert(triangles<2400,type+' bounded triangles');
+   const size=forms.meshes.size;assert.deepEqual(capture(m,80),active,type+' animations-off pose');assert.equal(forms.meshes.size,size);
+ }
+ assert.equal(signatures.size,Object.keys(R.TYPES).length,'all canonical model signatures remain distinct');assert.equal(JSON.stringify(R.TYPES),typesBefore,'combat definitions unchanged');
+ assert(forms.meshes.size<120,'cache bounded by shared anatomy, not canonical type or actor');
+ for(const [mesh,data] of forms.meshes){
+   assert(mesh.startsWith('creature/'));assert(data.length>=18&&data.length%18===0,mesh+' triangles');
+   for(let i=0;i<data.length;i+=6){assert(Array.from(data.slice(i,i+6)).every(Number.isFinite),mesh+' finite geometry');assert(Array.from(data.slice(i,i+3)).every(v=>Math.abs(v)<=1.00001),mesh+' unit bounds');assert(Math.abs(Math.hypot(data[i+3],data[i+4],data[i+5])-1)<1e-5,mesh+' unit normals');}
+ }
+ const size=forms.meshes.size;
+ for(let i=0;i<120;i++)for(const type of Object.keys(R.TYPES))capture({id:i,type,x:i*7,y:i*11,facing:{x:Math.sin(i),y:Math.cos(i)},walking:!!(i%2),footstep:i},i);
+ assert.equal(forms.meshes.size,size,'positions, IDs and times never grow the anatomy cache');
+});
+
+test('monster creature limbs, skull ribs, drapery and family accents preserve anatomical distinctions',()=>{
+ const {env,capture}=creatureAnatomyHarness(),render=type=>capture({type,x:0,y:0,facing:{x:0,y:1},walking:false}).calls;
+ const has=(calls,name)=>calls.some(a=>a[0].startsWith('creature/'+name+'/'));
+ for(const [type,shell] of [['wolf','wolf-body'],['rat','rat-body'],['boar','boar-body'],['bear','bear-body'],['spider','spider-abdomen'],['golem','golem-body'],['bandit','human-body'],['mage','robe'],['skeleton','skull'],['treant','wood-trunk'],['wraith','drapery'],['ancient','giant-head']])assert(has(render(type),shell),type+' '+shell);
+ for(const type of ['wolf','rat','boar','bear']){
+   const calls=render(type),limbs=calls.filter(a=>a[0]==='creature/limb/shell');assert.equal(limbs.length,12,type+' thigh, shin and hock segments');assert(limbs.some(a=>Math.abs(a[10])>.1),type+' bent leg segments');
+   assert(has(calls,type==='boar'?'hoof':'paw'));assert(has(calls,type==='boar'?'boar-tail':type==='rat'?'rat-tail':type==='wolf'?'wolf-tail':'bear-head'));
+   assert(has(calls,type==='rat'||type==='bear'?'round-ear':'ear'));assert(has(calls,type+'-muzzle'));
+ }
+ const spider=render('spider'),upper=spider.filter(a=>a[0]==='creature/bone/shell');assert.equal(upper.length,10,'eight radial upper legs and two fang roots');assert(spider.filter(a=>a[0]==='creature/limb/shell').length===8);assert.equal(spider.filter(a=>a[0]==='creature/point/shell').length,2,'hooked fang tips');
+ const ribs=env.HoMoWForms.meshes.get(render('skeleton').find(a=>a[0]==='creature/ribs/shell')[0]);assert(ribs.length/18>200,'open segmented rib cage');assert(has(render('skeleton'),'bone'));assert(has(render('treant'),'fork'));
+ for(const type of Object.keys(R.TYPES)){
+   const calls=render(type),v=env.HoMoWWorldStyle.mob(type),expected=v.elite||R.TYPES[type].boss?3:0;
+   assert.equal(calls.filter(a=>a[7]==='edce83'&&a[0]==='cone').length,expected,type+' crown distinction');
+   assert(calls.some(a=>a[7]===v.accent),type+' variant crest/accent');
+ }
+});
+
+test('creature transforms, conservative monster tops, options and warning picking remain valid',()=>{
+ const {env,scene,capture}=creatureAnatomyHarness(),forms=env.HoMoWForms;
+ for(const animations of [false,true])for(const type of Object.keys(R.TYPES))for(const facing of [{x:0,y:1},{x:1,y:0},{x:-.6,y:-.8}]){
+   scene.opt.animations=animations;const m={type,x:120,y:330,facing,walking:true,footstep:1.2},active=capture(m,2.3);
+   for(const a of active.calls){const data=forms.meshes.get(a[0]);if(!data)continue;const basis=forms.basis(a[8],a[10],a[11]);
+     for(let i=0;i<data.length;i+=6){const local=forms.point(basis,data[i]*a[4],data[i+1]*a[5],data[i+2]*a[6]);assert(a[2]+local[1]<=active.top+1e-4,type+' top contains tilted geometry');}
+   }
+ }
+ scene.opt.animations=false;const m=Object.freeze({id:52,type:'elite_wolf',x:120,y:330,facing:Object.freeze({x:1,y:0}),walking:true,footstep:1,telegraph:Object.freeze({kind:'cone'}),hazards:Object.freeze([Object.freeze({kind:'circle'}),Object.freeze({kind:'line'})])}),before=JSON.stringify(m);
+ scene.pickParts=[{stale:true}];const still=capture(m,2);assert.equal(scene.pickParts,null);assert.deepEqual(still.warnings,[[m.telegraph,m],[m.hazards[0],m],[m.hazards[1],m]]);
+ scene.opt.shadows=true;const shadowed=capture(m,80);assert.deepEqual(shadowed.calls.filter(a=>a[0]!=='sphere'),still.calls);assert.equal(shadowed.calls.filter(a=>a[0]==='sphere').length,still.calls.filter(a=>a[0]==='sphere').length+1);
+ scene.opt.shadows=false;scene.opt.animations=true;const moving=capture(m,2);assert.notDeepEqual(moving.calls,still.calls);assert.deepEqual(moving.calls.map(a=>a[0]),still.calls.map(a=>a[0]));assert.deepEqual(capture(m,2),moving);
+ const size=forms.meshes.size;scene.opt.lowTextures=true;const plain=capture(m,2);assert(plain.calls.every(a=>a[9]===null));assert(still.calls.some(a=>a[9]==='leather'));assert.deepEqual(plain.calls.map(a=>a[0]),moving.calls.map(a=>a[0]));assert.equal(forms.meshes.size,size);assert.equal(JSON.stringify(m),before);
+ scene.opt.animations=false;const a=capture({...m,type:'wolf',x:100,y:200,facing:{x:0,y:1}}),b=capture({...m,type:'wolf',x:300,y:400,facing:{x:1,y:0}});
+ assert.deepEqual(a.calls.map(v=>v[0]),b.calls.map(v=>v[0]));for(let i=0;i<a.calls.length;i++){const p=a.calls[i],q=b.calls[i];assert(Math.abs((q[1]-300)-(p[3]-200))<1e-8);assert(Math.abs((q[3]-400)+(p[1]-100))<1e-8);assert.equal(q[2],p[2]);assert.deepEqual(q.slice(4,8),p.slice(4,8));}
+});
+
+test('creature animal eye sockets sit in front of their faceted head shells rather than inside them',()=>{
+ const {env,capture}=creatureAnatomyHarness();
+ for(const type of ['wolf','rat','boar','bear']){
+   const {calls}=capture({type,x:0,y:0,facing:{x:0,y:1}}),heads=calls.filter(a=>a[0].startsWith('creature/'+type+'-head/')),eyes=calls.filter(a=>a[0]==='cube'&&a[7]==='233947');assert.equal(eyes.length,2,type+' eyes');
+   for(const eye of eyes){
+     let front=-Infinity;
+     for(const head of heads){const data=env.HoMoWForms.meshes.get(head[0]);
+       for(let i=0;i<data.length;i+=18){
+         const vertices=[0,6,12].map(j=>[head[1]+data[i+j]*head[4],head[2]+data[i+j+1]*head[5],head[3]+data[i+j+2]*head[6]]),[a,b,c]=vertices;
+         const dx=b[0]-a[0],dy=b[1]-a[1],ex=c[0]-a[0],ey=c[1]-a[1],det=dx*ey-ex*dy;if(Math.abs(det)<1e-10)continue;
+         const x=eye[1]-a[0],y=eye[2]-a[1],u=(x*ey-ex*y)/det,v=(dx*y-x*dy)/det;
+         if(u>=-1e-6&&v>=-1e-6&&u+v<=1+1e-6)front=Math.max(front,a[2]+u*(b[2]-a[2])+v*(c[2]-a[2]));
+       }
+     }
+     assert(Number.isFinite(front),type+' socket overlaps the head');assert(eye[3]+eye[6]*.5>front,type+' dark socket is visible outside the skull');
+   }
+ }
+});
+
+function mazeLayoutHarness(planned=false){
+ const env={console};env.window=env;vm.createContext(env);
+ const run=file=>vm.runInContext(fs.readFileSync(path.resolve(__dirname,file),'utf8'),env,{filename:file});
+ for(const file of ['../realms-data.js','../realms-loadout.js','../realms-skills.js','../realms-bosses.js','../realms-expeditions.js','../realms-evolution.js','village-data.js'])run(file);
+ const D=env.BrukRealmsData,original={nodes:D.NODES.map(n=>({id:n.id,type:n.type,cluster:D.clusterOf(n)})),spawns:D.SPAWNS.map(([type,x,y])=>({type,x,y,cluster:D.clusterOf({x,y})})),dungeons:JSON.stringify(D.DUNGEONS),obstacles:JSON.stringify(D.OBSTACLES.filter(o=>['house','mountain','citywall'].includes(o.type)))};
+ run('maze-data.js');const early=JSON.stringify(D.OBSTACLES);
+ for(const file of ['resource-layout.js','geography.js','../realms-core.js',planned?'layout.js':'layout-source.js'])run(file);
+ return {env,R:env.BrukRealms,M:env.HoMoWMaze,L:env.HoMoWLayout,original,early};
+}
+let mazeLayoutFixture;
+const mazeLayout=()=>mazeLayoutFixture||(mazeLayoutFixture=mazeLayoutHarness());
+function assertMazeRoute(R,from,to,label){
+ const points=R.findPath(from.x,from.y,to.x,to.y);assert(points.length,label+' has a route');assert(Math.hypot(points.at(-1).x-to.x,points.at(-1).y-to.y)<1,label+' reaches its actual endpoint');
+ let previous=from;for(const p of points){const steps=Math.max(1,Math.ceil(Math.hypot(p.x-previous.x,p.y-previous.y)/8));for(let i=1;i<=steps;i++)assert(!R.blocked(previous.x+(p.x-previous.x)*i/steps,previous.y+(p.y-previous.y)*i/steps,17),label+' walkable');previous=p;}
+ return points;
+}
+
+test('beta labyrinth early overlay and generated runtime have identical ordered geometry and content',()=>{
+ const source=mazeLayout(),runtime=mazeLayoutHarness(true),again=mazeLayoutHarness(true),{R,M,original}=source;
+ assert.equal(source.early,runtime.early);assert.equal(source.early,again.early);
+ for(const field of ['OBSTACLES','NODES','SPAWNS','DECOR'])assert.equal(JSON.stringify(R[field]),JSON.stringify(runtime.R[field]),field+' matches planner/browser');
+ assert.equal(JSON.stringify(R.DUNGEONS),original.dungeons);assert.equal(JSON.stringify(R.OBSTACLES.filter(o=>['house','mountain','citywall'].includes(o.type))),original.obstacles);
+ assert.equal(M.plainSpawns.length,6);assert.equal(R.SPAWNS.length,147);assert.equal(R.NODES.length,190);
+ for(const [i,n]of R.NODES.entries()){assert.equal(n.id,original.nodes[i].id);assert.equal(n.type,original.nodes[i].type);assert.equal(R.clusterOf(n),R.inVillage(n.x,n.y)?'village':original.nodes[i].cluster);}
+ for(const [i,[type,x,y]]of R.SPAWNS.slice(0,141).entries()){assert.equal(type,original.spawns[i].type);assert.equal(R.clusterOf({x,y}),original.spawns[i].cluster);}
+ for(const [i,m]of M.plainSpawns.entries()){assert.equal(m.id,141+i);assert.equal(R.SPAWNS[m.id][0],m.type);const p={x:R.SPAWNS[m.id][1],y:R.SPAWNS[m.id][2]};assert.equal(R.clusterOf(p),'c20');assert(M.inPlain(p));}
+ assert.equal(M.cells.length,55);assert(M.edges.length>54);assert.equal(M.thickness,24);
+ for(const region of M.regions)assert(M.contains({x:region.x+region.w/2,y:region.y+region.h/2}));
+ for(const d of R.DUNGEONS)assert(M.contains(d.spawn));assert(!M.contains({x:1500,y:3000}));assert(M.inPlain({x:1500,y:3000}));
+ const build=fs.readFileSync(path.join(__dirname,'build.py'),'utf8'),planner=fs.readFileSync(path.join(__dirname,'plan-layout.cjs'),'utf8');
+ assert(build.includes('village-data.js?v=\'+VERSION+\'\"></script><script src=\"maze-data.js?v=\'+VERSION+\'\"></script><script src=\"resource-layout.js'));
+ assert(planner.includes("'beta/village-data.js','beta/maze-data.js','beta/resource-layout.js'"));
+});
+
+test('beta labyrinth branching corridors connect every cell, both clusters and the cavern exit',()=>{
+ const {R,M,env}=mazeLayout(),byID=new Map(M.cells.map(p=>[p.id,p])),seen=new Set([M.cells[0].id]),queue=[M.cells[0].id];
+ for(const id of ['c10','c11']){const routes=env.HoMoWGeography.roads.get(id),hub=routes[0].at(-1);for(const route of routes){assert.equal(route.at(-1).x,hub.x,id+' route reaches hub');assert.equal(route.at(-1).y,hub.y,id+' route reaches hub');for(const p of route)assert(!R.blocked(p.x,p.y,17),id+' retained walkable road');}}
+ for(const id of queue)for(const [a,b]of M.edges){const next=a===id?b:b===id?a:null;if(next&&!seen.has(next)){seen.add(next);queue.push(next);}}
+ assert.equal(seen.size,55,'one physically connected branching maze');
+ for(const [a,b]of M.edges){const p=byID.get(a),q=byID.get(b);assert(!R.lineBlocked(p.x,p.y,q.x,q.y),a+' to '+b);assertMazeRoute(R,p,q,a+' to '+b);}
+ const gate=R.PORTALS.find(p=>p.id==='c10-c11');assert.equal(gate.x,2000);assert.equal(gate.y,2400);
+ for(let x=gate.x-140;x<=gate.x+140;x+=10)assert(!R.blocked(x,gate.y,50),'normal portal approach');
+ assertMazeRoute(R,byID.get('maze-west:0'),byID.get('maze-west:19'),'west branching route');assertMazeRoute(R,byID.get('maze-west:19'),gate,'west to authored portal');assertMazeRoute(R,gate,byID.get('maze-east:18'),'authored portal to east');assertMazeRoute(R,byID.get('maze-east:18'),byID.get('maze-east:29'),'east branching route');
+ for(const opening of M.openings){const nearest=M.cells.filter(p=>p.region===opening.region).sort((a,b)=>Math.hypot(a.x-opening.x,a.y-opening.y)-Math.hypot(b.x-opening.x,b.y-opening.y))[0];assertMazeRoute(R,opening,nearest,opening.region+' '+opening.side);}
+ for(const [id,target]of [['c00-c10','maze-west:0'],['c10-c20','maze-west:20'],['c01-c11','maze-east:4'],['c11-c21','maze-east:28']])assertMazeRoute(R,R.PORTALS.find(p=>p.id===id),byID.get(target),id+' joins maze');
+ const d=R.DUNGEONS.find(d=>d.id==='cavern');assertMazeRoute(R,d.chest,M.exteriorConnections.at(-1),'cavern chest to west entrance');
+ for(let y=1645+18;y<=1805-18;y+=10)assert(!R.blocked(849,y,17),'160-wide final-room opening');
+ for(const id of ['crypt','vault']){const a=R.DUNGEONS.find(d=>d.id===id).arena;assert(R.blocked(a.x+a.w-11,a.y+125,17),id+' remains enclosed');}
+});
+
+test('beta labyrinth dungeon baffles preserve every authored wave and stage approach',()=>{
+ const {R,M,original}=mazeLayout();
+ for(const d of R.DUNGEONS){const points=[d.spawn,d.chest,d.exit,...d.waves.flat().map(id=>({x:R.SPAWNS[id][1],y:R.SPAWNS[id][2]}))];
+ assert(M.dungeonWalls.filter(o=>o.dungeon===d.id).length>=9,d.id+' has branches in all stages');
+ for(const o of M.dungeonWalls.filter(o=>o.dungeon===d.id))for(const p of points)assert(Math.hypot(p.x-Math.max(o.x,Math.min(o.x+o.w,p.x)),p.y-Math.max(o.y,Math.min(o.y+o.h,p.y)))>=105,d.id+' protected authored point');
+ for(const [stage,wave]of d.waves.entries()){const start=stage===0?d.spawn:{x:d.gates[stage-1].x+70,y:d.gates[stage-1].y-35};for(const id of wave){const s=R.SPAWNS[id],p={x:s[1],y:s[2]};assert.deepEqual(JSON.parse(JSON.stringify(s)),[original.spawns[id].type,original.spawns[id].x,original.spawns[id].y]);assert(!R.blocked(p.x,p.y,40));assertMazeRoute(R,start,p,d.id+' wave '+id);}}
+ for(const g of d.gates)assertMazeRoute(R,{x:g.x+70,y:g.y+75},{x:g.x+70,y:g.y-55},d.id+' stage '+g.stage);
+ assertMazeRoute(R,d.spawn,d.exit,d.id+' exit');assertMazeRoute(R,{x:d.arena.x+d.arena.w/2,y:d.arena.y+125},d.chest,d.id+' chest');
+ }
+});
+
+test('beta labyrinth placement keeps wood outside inhabited open plains without weakening spacing',()=>{
+ const {R,M,L,original}=mazeLayout();
+ for(const n of R.NODES){assert(L.free(n,50),'clear node '+n.id);assert(L.gateFree(n,180),'node gate clearance '+n.id);if(!R.clusterOf(n).startsWith('dungeon:'))assert(L.roadFree(n,64),'node road clearance '+n.id);if(R.NODE_TYPES[n.type].tool==='axe')assert(!M.inPlain(n),'wood remains visible outside plain '+n.id);}
+ for(const [id,[type,x,y]]of R.SPAWNS.entries()){const p={x,y},radius=R.TYPES[type].radius;assert(!R.blocked(x,y,radius+20),'clear authored mob '+id);if(R.clusterOf(p).startsWith('dungeon:'))continue;assert(L.free(p,radius+20),'mob/border clearance '+id);if(type!=='pass_guardian'){assert(L.gateFree(p,235));assert(L.roadFree(p,85));}assert(R.NODES.every(n=>Math.hypot(x-n.x,y-n.y)>radius+85),'mob/node separation '+id);}
+ for(const [i,n]of R.NODES.entries())for(const other of R.NODES.slice(i+1))assert(Math.hypot(n.x-other.x,n.y-other.y)>100,'separate nodes');
+ for(const a of M.plainRegions){assert(R.NODES.some(n=>M.within(n,a)&&R.NODE_TYPES[n.type].tool!=='axe'),a.id+' has nonwood resources');assert(R.SPAWNS.some(s=>M.within({x:s[1],y:s[2]},a)),a.id+' has mobs');}
+ assert(R.SPAWNS.filter(s=>M.inPlain({x:s[1],y:s[2]})).length>=2);
+ for(const a of M.regions)assert(R.SPAWNS.filter(s=>M.within({x:s[1],y:s[2]},a)).length>=3,a.id+' remains an inhabited mob labyrinth');
+ for(const o of R.OBSTACLES.filter(o=>!o.betaMaze))assert(!M.plainRegions.some(a=>o.x<a.x+a.w&&o.x+o.w>a.x&&o.y<a.y+a.h&&o.y+o.h>a.y),'treeless plain');
+ for(const p of R.DECOR.filter(p=>M.contains(p)||M.inPlain(p)))assert(['grass','flowers'].includes(p.kind));
+ assert(R.DECOR.some(p=>M.contains(p)&&p.kind==='flowers'),'retain low flowering ground cover');
+ assert(R.PORTALS.some(p=>p.betaDungeon));assert(!L.segments.some(([a,b])=>a.x===860&&a.y===1725||b.x===860&&b.y===1725),'dungeon portal excluded from ordinary hub roads');
 });

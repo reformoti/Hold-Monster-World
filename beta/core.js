@@ -82,7 +82,12 @@
     SPAWNS.forEach(([type],id)=>{const m=record(raw.mobState?.[id]);if(Number.isFinite(m.hp))s.mobState[id]={hp:clamp(m.hp,0,TYPES[type].hp),readyAt:stamp(m.readyAt)};});
     if(Array.isArray(raw.drops))for(const drop of raw.drops.slice(-40)){if(!Number.isFinite(drop?.x)||!Number.isFinite(drop?.y))continue;s.drops.push({x:clamp(drop.x,0,WIDTH),y:clamp(drop.y,0,HEIGHT),resources:resourceMap(drop.resources)});}
     E.normalize(raw,s);s.mounts={};s.mountHp={};for(const [id,m] of Object.entries(D.MOUNTS))if(raw.mounts?.[id]===true){s.mounts[id]=true;s.mountHp[id]=Number.isFinite(raw.mountHp?.[id])?clamp(raw.mountHp[id],0,m.hp):m.hp;}s.selectedMount=has(s.mounts,raw.selectedMount)?raw.selectedMount:Object.keys(s.mounts)[0]||null;s.mounted=raw.mounted===true&&!!s.selectedMount&&s.mountHp[s.selectedMount]>0;s.mountReadyAt=stamp(raw.mountReadyAt);s.appearance=L.appearance(raw.appearance);s.weaponSkills={};for(const [id,list] of Object.entries(D.SKILL_CHOICES))s.weaponSkills[id]=list.some(k=>k.id===raw.weaponSkills?.[id])?raw.weaponSkills[id]:'standard';s.bagLayout=L.layout(s,raw.bagLayout);
-    P.restore(s,raw);s.hp=Number.isFinite(raw.hp)?clamp(raw.hp,1,maxHp(s)):maxHp(s);s.mana=Number.isFinite(raw.mana)?clamp(raw.mana,0,maxMana(s)):maxMana(s);if(blocked(s.x,s.y)||personalBlocked(s,s.x,s.y)){s.x=SPAWN.x;s.y=SPAWN.y;}Object.assign(s,X.normalize({...raw,x:s.x,y:s.y}));return s;
+    P.restore(s,raw);s.hp=Number.isFinite(raw.hp)?clamp(raw.hp,1,maxHp(s)):maxHp(s);s.mana=Number.isFinite(raw.mana)?clamp(raw.mana,0,maxMana(s)):maxMana(s);if(blocked(s.x,s.y)||personalBlocked(s,s.x,s.y)){
+const origin={x:s.x,y:s.y},cluster=D.clusterOf(origin);let found=false;
+outer:for(let radius=25;radius<=600;radius+=25)for(let i=0;i<32;i++){
+const x=origin.x+Math.cos(i*Math.PI/16)*radius,y=origin.y+Math.sin(i*Math.PI/16)*radius;
+if(D.clusterOf({x,y})===cluster&&!blocked(x,y)&&!personalBlocked(s,x,y)&&!X.blocked({expeditions:{run:raw.expeditions?.run}},x,y)){s.x=x;s.y=y;found=true;break outer;}}
+if(!found){s.x=SPAWN.x;s.y=SPAWN.y;}}Object.assign(s,X.normalize({...raw,x:s.x,y:s.y}));return s;
   }
   function gearOffer(s,slot,kind){
     let current,cost,tier,max,mastery=0,material={};

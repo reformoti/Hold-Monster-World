@@ -15,7 +15,7 @@ function triangle(frame,face,ia,ib,ic){
  const db=b.depth-a.depth,dc=c.depth-a.depth;
  const texture=face.material&&S.pixels(face.material),mask=S.tileSize-1,uv=face.uv;
  const ua=texture?uv[ia]:null,ub=texture?uv[ib]:null,uc=texture?uv[ic]:null;
- const rgb=face.rgb,color=0xff000000|(rgb[2]<<16)|(rgb[1]<<8)|rgb[0];
+ const rgb=face.rgb,color=0xff000000|(rgb[2]<<16)|(rgb[1]<<8)|rgb[0],fog=face.visibility;
  for(let row=first;row<=last;row++){
    const dy=row+.5-y,dx=start+.5-x,vertical=(row+.5-cy0)*cutY;
    let u=ux*dx+uy*dy,v=vx*dx+vy*dy,idx=row*width+start;
@@ -24,11 +24,21 @@ function triangle(frame,face,ia,ib,ic){
      const z=a.depth+u*db+v*dc;
      if(z<depth[idx])continue;
      if(cut&&z>cut.depth+5&&vertical*vertical+((col+.5-cx0)*cutX)**2<1)continue;
+     let fade=0;
+     if(fog){
+       const wx=a.wx+u*(b.wx-a.wx)+v*(c.wx-a.wx),wz=a.wz+u*(b.wz-a.wz)+v*(c.wz-a.wz),distance=Math.hypot(wx-fog.x,wz-fog.y);
+       if(distance>fog.radius)continue;
+       const t=Math.max(0,Math.min(1,(distance-fog.start)/(fog.radius-fog.start)));fade=t*t*(3-2*t);
+     }
      depth[idx]=z;
-     if(!texture){pixels[idx]=color;continue;}
-     const tx=Math.floor(ua.x+u*(ub.x-ua.x)+v*(uc.x-ua.x))&mask,ty=Math.floor(ua.y+u*(ub.y-ua.y)+v*(uc.y-ua.y))&mask;
-     const light=texture[(ty*S.tileSize+tx)*4]/255;
-     pixels[idx]=0xff000000|(Math.round(rgb[2]*light)<<16)|(Math.round(rgb[1]*light)<<8)|Math.round(rgb[0]*light);
+     if(!texture&&!fade){pixels[idx]=color;continue;}
+     let light=1;
+     if(texture){
+       const tx=Math.floor(ua.x+u*(ub.x-ua.x)+v*(uc.x-ua.x))&mask,ty=Math.floor(ua.y+u*(ub.y-ua.y)+v*(uc.y-ua.y))&mask;
+       light=texture[(ty*S.tileSize+tx)*4]/255;
+     }
+     const red=Math.round(rgb[0]*light*(1-fade)+89*fade),green=Math.round(rgb[1]*light*(1-fade)+99*fade),blue=Math.round(rgb[2]*light*(1-fade)+88*fade);
+     pixels[idx]=0xff000000|(blue<<16)|(green<<8)|red;
    }
  }
 }
@@ -52,7 +62,7 @@ function flush(view,transparent){
  if(fixed&&fixed===frame.fixed){
    frame.pixels.set(frame.staticPixels);frame.depth.set(frame.staticDepth);
  }else{
-   frame.pixels.fill(transparent?0:0xff688076);frame.depth.fill(-Infinity);
+   frame.pixels.fill(transparent?0:view.visibility?0xff586359:0xff688076);frame.depth.fill(-Infinity);
    if(fixed){
      paint(frame,fixed,0,fixed.length);
      frame.staticPixels??=new Uint32Array(width*height);frame.staticDepth??=new Float32Array(width*height);
