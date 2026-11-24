@@ -4,7 +4,7 @@ import re
 import subprocess
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
-VERSION = '0.18.0'
+VERSION = '0.19.0'
 
 def replace_once(text, old, new):
     if text.count(old) != 1:
@@ -63,6 +63,15 @@ def build():
     panels = replace_once(panels, "if(townTab==='quartermaster'){", "if(townTab==='quartermaster'){root.append(el('h3','market-section-title','Місце відродження'),el('p','','Прив’язано: '+world.homeName()),button('Прив’язати до цього поселення',()=>result(()=>world.bindHome()),s.homeTown===(R.inCity(s.x,s.y)?'city':'village')));")
     panels = replace_once(panels, "if(o&&!o.complete){card.append(description(Object.entries(o.input)", "if(o&&!o.complete){if(!o.available)card.append(description('Для цього рангу потрібна міська рунна майстерня.'));else if(world.state.silver<o.cost)card.append(description('Бракує срібла: '+(o.cost-world.state.silver)));card.append(description(Object.entries(o.input)")
     panels = replace_once(panels, "R.RESOURCES[key].name+' ×'+n).join(' · ')));const b=button('Зачарувати", "R.RESOURCES[key].name+' '+(world.state.resources[key]+world.state.bank[key])+'/'+n).join(' · ')));const b=button('Зачарувати")
+    panels = replace_once(panels, "inventorySlot='variant';", "inventorySlot='variant',stockQuery='',stockCategory='all',stockAvailable=false;")
+    panels = replace_once(panels, "head.append(art(['variant','outfit']", "card.dataset.stockCategory=slot;card.dataset.stockName=item.name;head.append(art(['variant','outfit']")
+    panels = replace_once(panels, "if(!offer.available)card.append(el('small','locked-reason',offer.reason));", "if(!offer.available)card.append(el('small','locked-reason',offer.reason));else if(s.silver<(forge?offer.fee:offer.cost))card.append(el('small','locked-reason','Бракує срібла: '+((forge?offer.fee:offer.cost)-s.silver)));" )
+    panels = replace_once(panels, "const head=el('div','gear-card-head'),text=el('div','');head.append(art(kind,tier)", "card.dataset.stockCategory='tools';card.dataset.stockName=item.name;const head=el('div','gear-card-head'),text=el('div','');head.append(art(kind,tier)")
+    panels = replace_once(panels, "root.scrollTop=scroll;}",  """if(root.querySelector('[data-stock-category]')){
+const bar=el('div','shop-toolbar'),search=el('input'),select=el('select'),label=el('label'),available=el('input'),count=el('small','shop-filter-count');search.type='search';search.placeholder='Пошук спорядження';search.value=stockQuery;search.setAttribute('aria-label','Пошук у майстра');
+const present=new Set([...root.querySelectorAll('[data-stock-category]')].map(card=>card.dataset.stockCategory));for(const [id,name]of Object.entries({all:'Усі категорії',...categories})){if(id!=='all'&&!present.has(id))continue;const option=el('option','',name);option.value=id;select.append(option);}if(!present.has(stockCategory))stockCategory='all';select.value=stockCategory;select.setAttribute('aria-label','Категорія спорядження');available.type='checkbox';available.checked=stockAvailable;label.append(available,document.createTextNode('Доступні дії'));
+const apply=()=>{stockQuery=search.value;stockCategory=select.value;stockAvailable=available.checked;const q=stockQuery.trim().toLocaleLowerCase('uk-UA');let shown=0,total=0;for(const card of root.querySelectorAll('[data-stock-category]')){total++;const active=card.querySelector('[data-buy-gear]:not(:disabled),[data-forge-gear]:not(:disabled),[data-enchant]:not(:disabled),[data-tool]:not(:disabled)');const visible=(!q||card.dataset.stockName.toLocaleLowerCase('uk-UA').includes(q))&&(stockCategory==='all'||stockCategory===card.dataset.stockCategory)&&(!stockAvailable||active);card.hidden=!visible;if(visible)shown++;}for(const grid of root.querySelectorAll('.gear-grid')){grid.hidden=![...grid.children].some(card=>!card.hidden);if(grid.previousElementSibling?.classList.contains('market-section-title'))grid.previousElementSibling.hidden=grid.hidden;}count.textContent=shown+' / '+total+' предметів';};search.oninput=select.onchange=available.onchange=apply;bar.append(search,select,label,count);root.prepend(bar);apply();
+}root.scrollTop=scroll;}""")
     (HERE / 'panels.js').write_text(panels.rstrip()+'\n')
     html = re.sub(r'src="../realms-panels\.js[^"]*"', 'src="panels.js?v='+VERSION+'"', html)
     inns = (ROOT / 'homow-expeditions.js').read_text()
@@ -76,7 +85,7 @@ def build():
     (HERE / 'music.js').write_text(music)
     html = re.sub(r'src="../homow-music\.js[^"]*"', 'src="music.js?v='+VERSION+'"', html)
     html = re.sub(r'src="../release\.js[^"]*"', 'src="release.js?v='+VERSION+'"', html)
-    (HERE / 'release.js').write_text("window.BrukRelease=Object.freeze({version:'"+VERSION+"',date:'2026-11-23',name:'3D-бета'});document.querySelectorAll('[data-game-version]').forEach(el=>el.textContent='v"+VERSION+" · БЕТА');document.title='HoMoW · 3D-бета "+VERSION+"';\n")
+    (HERE / 'release.js').write_text("window.BrukRelease=Object.freeze({version:'"+VERSION+"',date:'2026-11-24',name:'3D-бета'});document.querySelectorAll('[data-game-version]').forEach(el=>el.textContent='v"+VERSION+" · БЕТА');document.title='HoMoW · 3D-бета "+VERSION+"';\n")
     inventory = (ROOT / 'homow-inventory.js').read_text()
     start = inventory.index('function preview(')
     end = inventory.index('function change(', start)
@@ -88,8 +97,30 @@ def build():
     inventory = replace_once(inventory, "preview(figure,draft);const controls", "let equipped=false;const paint=()=>{figure.replaceChildren();preview(figure,draft,!equipped);};paint();const controls")
     inventory = replace_once(inventory, "figure.replaceChildren();preview(figure,draft);", "paint();")
     inventory = replace_once(inventory, "controls.append(btn('Зберегти вигляд'", "const gear=btn('Показати спорядження',()=>{equipped=!equipped;gear.setAttribute('aria-pressed',String(equipped));paint();});gear.setAttribute('aria-pressed','false');controls.append(gear,btn('Зберегти вигляд'")
+    inventory = replace_once(inventory, "b.dataset.slotIndex=String(index);if(item)", "b.dataset.slotIndex=String(index);b.setAttribute('aria-label',item?item.name+(item.quantity>1?' · '+item.quantity:''):'Порожня комірка '+(Number(index)+1));if(item)")
+    inventory = replace_once(inventory, "root.append(columns);const detail", """root.append(columns);
+const toolbar=el('div','pack-toolbar'),search=el('input'),filter=el('select'),count=el('small','pack-filter-count');search.type='search';search.placeholder='Знайти предмет у сумці';search.setAttribute('aria-label','Пошук в інвентарі');search.value=bagQuery;
+for(const [id,name]of Object.entries({all:'Усі предмети',gear:'Спорядження',resource:'Ресурси',tool:'Інструменти',potion:'Зілля',mount:'Скакуни'})){const option=el('option','',name);option.value=id;filter.append(option);}filter.value=bagFilter;filter.setAttribute('aria-label','Категорія предметів');
+const applyFilter=()=>{bagQuery=search.value;bagFilter=filter.value;const q=bagQuery.trim().toLocaleLowerCase('uk-UA');let shown=0;for(const node of grid.children){const entry=byKey.get(node.dataset.itemKey),fits=bagFilter==='all'||bagFilter==='gear'&&entry&&['variant','armor','outfit','support','extra'].includes(entry.slot)||entry?.slot===bagFilter;const visible=(!q||entry?.name.toLocaleLowerCase('uk-UA').includes(q))&&fits;node.hidden=!visible;if(visible&&entry)shown++;}count.textContent=shown+' / '+all.length+' предметів · '+R.inventoryLayout(s).filter(Boolean).length+' зайнятих комірок';};search.oninput=applyFilter;filter.onchange=applyFilter;const reset=btn('Скинути',()=>{search.value='';filter.value='all';applyFilter();});toolbar.append(search,filter,reset,count);grid.before(toolbar);applyFilter();
+const load=el('progress','pack-load');load.max=R.capacity(s);load.value=R.weight(s);load.setAttribute('aria-label','Вага сумки');bag.querySelector('.pack-balance').after(load);const detail""")
+    inventory = replace_once(inventory, "draft={...world.state.appearance};const names", "draft={...world.state.appearance},bagQuery='',bagFilter='all';const names")
+    inventory = replace_once(inventory, "detail.append(art,copy);if(['variant'", "copy.append(el('small','pack-item-meta',item.slot==='resource'?'Вага стосу: '+(item.quantity*R.RESOURCES[item.id].weight).toFixed(1):'Тир T'+item.tier+' · '+(Object.values(gear).includes(item.key)?'Екіпіровано':'У колекції')));detail.append(art,copy);if(['variant'")
+    inventory = replace_once(inventory, "Object.values(gear).includes(item.key)));if(item.slot==='potion')", "Object.values(gear).includes(item.key)||world.inCombat()||item.slot==='support'&&!R.offhandActive(s)));if(item.slot==='potion')")
+    inventory = replace_once(inventory, "else detail.append(el('p','','Обери предмет.'));", "else detail.append(el('p','','Обери предмет, щоб побачити характеристики й доступні дії.'));" )
     (HERE / 'inventory.js').write_text(inventory)
     html = re.sub(r'src="../homow-inventory\.js[^"]*"', 'src="inventory.js?v='+VERSION+'"', html)
+    hud = (ROOT / 'realms-hud.js').read_text()
+    hud = replace_once(hud, "if(hotkey){const k=document.createElement('kbd');", "const labelNode=document.createElement('span');labelNode.className='hud-button-label';labelNode.textContent=label;b.append(labelNode);if(hotkey){const k=document.createElement('kbd');")
+    (HERE / 'hud.js').write_text(hud)
+    html = re.sub(r'src="../realms-hud\.js[^"]*"', 'src="hud.js?v='+VERSION+'"', html)
+    market = (ROOT / 'homow-market.js').read_text()
+    market = replace_once(market, "const r=R.RESOURCES[selected];", "if(filtered.length&&!filtered.some(([id])=>id===selected))selected=filtered[0][0];if(!filtered.length){detail.append(make('p','','Змініть фільтри, щоб вибрати ресурс.'));return;}const r=R.RESOURCES[selected];")
+    market = replace_once(market, "const header=make('div','exchange-row exchange-head');", "if(!filtered.some(([id])=>id===selected)&&filtered.length)selected=filtered[0][0];const header=make('div','exchange-row exchange-head');")
+    market = replace_once(market, "const amount=make('input');", "const presets=make('div','exchange-presets');for(const n of [1,5,10,100])presets.append(button(String(n),()=>{amount.value=n;update();}));presets.append(button('MAX',()=>{const price=mode==='buy'?Math.ceil(world.quote(selected)*1.3):world.quote(selected);amount.value=Math.max(1,Math.min(1000,mode==='buy'?Math.floor(s.silver/price):Math.max(s.resources[selected],s.bank[selected])));update();}));detail.append(presets);const amount=make('input');")
+    market = replace_once(market, "const b=button('Продати '+name.toLowerCase(),", "const b=button('Продати '+name.toLowerCase()+' · '+qty+' → ◈ '+(valid?qty*price:0),")
+    market = replace_once(market, "'Купити → у сховище',", "'Купити '+qty+' → у сховище',")
+    (HERE / 'market.js').write_text(market)
+    html = re.sub(r'src="../homow-market\.js[^"]*"', 'src="market.js?v='+VERSION+'"', html)
     html = html.replace('</head>', '<link rel="stylesheet" href="inventory.css?v='+VERSION+'"></head>')
     html = html.replace('</head>', '<link rel="stylesheet" href="destiny.css?v='+VERSION+'"></head>')
     html = html.replace('</head>', '<link rel="stylesheet" href="world.css?v='+VERSION+'"></head>')
@@ -109,6 +140,9 @@ def build():
     ui = replace_once(ui, "+${event.xp} досвіду", "+${event.xp} ${world.state.level===100&&!world.state.monolithAwakened?'XP у резерв':'XP'}")
     ui = replace_once(ui, "hint.textContent=closest?", "const landmark=['inn','hall'].map(id=>R.CITY_LANDMARKS[id]).find(n=>Math.hypot(s.x-n.x,s.y-n.y)<105);hint.textContent=landmark&&(!closest||Math.hypot(closest[1].x-s.x,closest[1].y-s.y)>=60)?'E · '+landmark.name:closest?")
     ui = replace_once(ui, 'M.decorate(A,R);', 'M.decorate(A,R);window.HoMoWArmoryIcons.install(A,R);')
+    ui = replace_once(ui, "$('abilityAction').title='R · '+ability.name+' · '+ability.description;", "$('abilityAction').title='R · '+ability.name+' · '+ability.description;$('abilityAction').querySelector('small').firstChild.textContent=ability.name+' ';$('abilityAction').setAttribute('aria-label',ability.name);" )
+    ui = replace_once(ui, "document.querySelector('.world-actions').append(mountAction);", "document.querySelector('.hud-utility').append(mountAction);" )
+    ui = replace_once(ui, "let activityAt=0;", "for(const button of document.querySelectorAll('.hud-round')){if(button.querySelector('.hud-button-label'))continue;const text=document.createElement('span');text.className='hud-button-label';text.textContent=button.getAttribute('aria-label')||button.title;button.append(text);}let activityAt=0;" )
     ui = replace_once(ui, "KEY='brukivka_realms_v1'", "KEY='homow_beta_full_v1'")
     ui = ui.replace("const raw=localStorage.getItem(KEY);", "const raw=localStorage.getItem(KEY)||localStorage.getItem('brukivka_realms_v1');")
     ui = ui.replace("if(raw&&saved.schema!==2&&!localStorage.getItem('brukivka_realms_backup_v1'))localStorage.setItem('brukivka_realms_backup_v1',raw);", '')

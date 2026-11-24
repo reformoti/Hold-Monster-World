@@ -27,6 +27,33 @@
       const diamond = Math.abs(u - .5) + Math.abs(v - .5);
       if (Math.abs(diamond - .32) < .045) return 1;
       return .76 + .15 * Math.cos(tau * (u - v)) + .06 * Math.cos(tau * diamond);
+    },
+    plaster(u, v) {
+      return .92 + .035 * Math.cos(tau * (5 * u + 3 * v)) + .025 * Math.cos(tau * (19 * u - 13 * v));
+    },
+    stone(u, v) {
+      const row = Math.floor(v * 2), joint = (u * 2 + row * .5) % 1;
+      if ((v * 2) % 1 < .065 || joint < .045) return .62;
+      return .88 + .06 * Math.cos(tau * (3 * u + v)) + .04 * Math.cos(tau * (17 * u - 11 * v));
+    },
+    slate(u, v) {
+      const row = Math.floor(v * 3), seam = (u * 3 + row * .5) % 1;
+      if ((v * 3) % 1 < .07 || seam < .055) return .63;
+      return .87 + .07 * Math.cos(tau * (u + 3 * v)) + .04 * Math.cos(tau * (15 * u + 9 * v));
+    },
+    rock(u, v) {
+      return .86 + .07 * Math.cos(tau * (2 * u + 3 * v)) + .04 * Math.cos(tau * (7 * u - 5 * v)) + .025 * Math.cos(tau * (23 * u + 17 * v));
+    },
+    grass(u, v) {
+      return .91 + .035 * Math.cos(tau * (3 * u + 2 * v)) + .04 * Math.cos(tau * (21 * u - 4 * v)) * Math.cos(tau * (5 * u + 17 * v));
+    },
+    soil(u, v) {
+      return .89 + .065 * Math.cos(tau * (4 * u + 3 * v)) + .045 * Math.cos(tau * (13 * u - 11 * v)) + .025 * Math.cos(tau * (27 * u + 19 * v));
+    },
+    cobble(u, v) {
+      const row = Math.floor(v * 2), x = (u * 2 + row * .5) % 1, y = (v * 2) % 1;
+      if (x < .07 || y < .09 || x < .13 && y < .16) return .59;
+      return .86 + .075 * Math.sin(Math.PI * x) * Math.sin(Math.PI * y) + .035 * Math.cos(tau * (11 * u - 9 * v));
     }
   };
 

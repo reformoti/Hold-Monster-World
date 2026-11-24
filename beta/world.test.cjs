@@ -12,7 +12,7 @@ test('canonical full UI boots and renders all clusters with software 3D without 
  window.HTMLElement.prototype.getBoundingClientRect=()=>({x:0,y:0,left:0,top:0,width:1000,height:660});
  window.HTMLCanvasElement.prototype.getContext=function(type){return type==='webgl'?null:ctx;};
  Object.defineProperty(window.HTMLSelectElement.prototype,'value',{configurable:true,get(){return this.querySelector('option[selected]')?.getAttribute('value')||'';},set(value){for(const o of this.querySelectorAll('option'))o.toggleAttribute('selected',o.getAttribute('value')===value);}});
- window.HTMLElement.prototype.showModal=function(){this.setAttribute('open','');};window.HTMLElement.prototype.close=function(){this.removeAttribute('open');};Object.defineProperty(window.HTMLElement.prototype,'open',{get(){return this.hasAttribute('open');}});
+ window.HTMLElement.prototype.showModal=function(){this.setAttribute('open','');};window.HTMLElement.prototype.close=function(){this.removeAttribute('open');};Object.defineProperty(window.HTMLElement.prototype,'open',{configurable:true,get(){return this.hasAttribute('open');}});
  const storage=new Map(),pending=[];
  const env={document,console,performance,Intl,URL,URLSearchParams,location:{href:'http://localhost/beta/full/',search:'',origin:'http://localhost',pathname:'/beta/full/'},localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},sessionStorage:{getItem:()=>null,removeItem:noop},devicePixelRatio:1,innerWidth:1000,innerHeight:660,matchMedia:()=>({matches:false,addEventListener:noop}),Blob,requestAnimationFrame:fn=>{pending.push(fn);return pending.length;},cancelAnimationFrame:noop,setTimeout:()=>1,clearTimeout:noop,setInterval:()=>1,clearInterval:noop,addEventListener:noop,dispatchEvent:noop,CustomEvent:window.CustomEvent,ResizeObserver:class{observe(){}},Audio:class{addEventListener(){}pause(){}load(){}play(){return Promise.resolve();}},getComputedStyle:()=>({getPropertyValue:()=>'',display:'block'})};env.NodeFilter={SHOW_ELEMENT:1,SHOW_TEXT:4};env.Node=window.Node;env.Element=window.Element;env.HTMLElement=window.HTMLElement;env.MutationObserver=window.MutationObserver;env.window=env;env.navigator={userAgent:'test desktop',hardwareConcurrency:4};const context=vm.createContext(env);
  let oreSnapshot;for(const match of document.querySelectorAll('script[src]')){const src=match.getAttribute('src').split('?')[0],file=path.resolve(__dirname,src);if(src==='resource-layout.js')oreSnapshot=env.BrukRealmsData.NODES.map(n=>({id:n.id,type:n.type,cluster:env.BrukRealmsData.clusterOf(n)}));vm.runInContext(fs.readFileSync(file,'utf8'),context,{filename:file});}
@@ -312,6 +312,99 @@ test('hero experience migrates once, carries levels and releases the level-100 r
  const kill=new World();const foe=kill.monsters[0],before=kill.state.xp;kill.hitMonster(foe,1e8);
  const event=kill.drainEvents().find(e=>e.type==='kill');assert(event.xp>0);assert.equal(kill.state.xp-before,event.xp);
 });
+test('houses use cached tiled roofs, framed doors and textured structural materials',()=>{
+ const env={HoMoWGeography:{landscape:{}},HoMoWTrees:{draw(){}}};env.window=env;vm.createContext(env);
+ for(const file of ['faceted-meshes','world-style','world-art'])vm.runInContext(fs.readFileSync(path.join(__dirname,file+'.js'),'utf8'),env);
+ const calls=[],scene={opt:{animations:false},draw(...args){calls.push(args);}};
+ const sizes={blacksmith:[170,125],mage:[110,125],enchanter:[120,105],armorer:[130,110],alchemist:[115,100],artificer:[130,90],quartermaster:[120,100],market:[110,80],hall:[130,96],inn:[144,100]};
+ for(const [owner,[w,h]] of Object.entries(sizes)){
+   calls.length=0;const house={owner,x:200,y:300,w,h},before=JSON.stringify(house);
+   env.HoMoWEnvironment.building.call(scene,house,1);
+   assert.equal(JSON.stringify(house),before);assert(calls.some(a=>a[9]==='wood'));assert(calls.some(a=>a[9]==='stone'));
+   if(owner!=='market'){
+     assert(calls.some(a=>a[9]==='plaster'));assert(calls.some(a=>a[9]==='slate'));
+     const tiles=calls.find(a=>a[0].endsWith('/roof'));assert(tiles);
+     const data=env.HoMoWForms.meshes.get(tiles[0]);assert(data.length>180);
+     if(owner!=='mage')for(let i=0;i<data.length;i+=6)assert(data[i+4]>0,'roof faces point upwards');
+   }
+   assert(calls.length<60,'bounded house draw calls');
+   const cached=env.HoMoWForms.meshes.size;
+   const geometry=JSON.stringify(calls);calls.length=0;env.HoMoWEnvironment.building.call(scene,house,20);
+   assert.equal(env.HoMoWForms.meshes.size,cached);assert.equal(JSON.stringify(calls),geometry,'animations-off house is stationary');
+ }
+ for(const data of env.HoMoWForms.meshes.values())for(let i=0;i<data.length;i+=6){
+   assert(Number.isFinite(data[i]+data[i+1]+data[i+2]));assert(Math.abs(Math.hypot(data[i+3],data[i+4],data[i+5])-1)<1e-5);
+ }
+});
+
+test('ore tiers have irregular seeded host rock, surface veins and depleted remnants',()=>{
+ const env={HoMoWGeography:{landscape:{}},HoMoWTrees:{draw(){}}};env.window=env;vm.createContext(env);
+ for(const file of ['faceted-meshes','world-style','world-art'])vm.runInContext(fs.readFileSync(path.join(__dirname,file+'.js'),'utf8'),env);
+ const calls=[],scene={...env.HoMoWEnvironment,draw(...args){calls.push(args);}},signatures=new Set();
+ for(const type of ['copper','iron','mithril','crystal','stone',...Array.from({length:8},(_,i)=>'ore_t'+(i+1))]){
+   const n={id:71,type,x:500,y:500,charges:3},before=JSON.stringify(n),v=env.HoMoWWorldStyle.resource(type);
+   calls.length=0;env.HoMoWEnvironment.resource.call(scene,n,1);
+   assert.equal(JSON.stringify(n),before);assert(calls.every(a=>a[0].startsWith('geology/')));
+   if(v.family!=='stone')assert(calls.some(a=>a[0].endsWith('/vein')));
+   const active=JSON.stringify(calls),rock=calls.filter(a=>a[9]==='rock').map(a=>a[0]);signatures.add(active);
+   const count=env.HoMoWForms.meshes.size;calls.length=0;env.HoMoWEnvironment.resource.call(scene,n,20);
+   assert.equal(JSON.stringify(calls),active);assert.equal(env.HoMoWForms.meshes.size,count);
+   calls.length=0;env.HoMoWEnvironment.resource.call(scene,{...n,charges:0},20);
+   assert.deepEqual(calls.map(a=>a[0]),rock);assert(calls.every(a=>a[5]===.36));
+   for(const name of rock){const data=env.HoMoWForms.meshes.get(name);for(let i=0;i<data.length;i+=6){
+     assert(Number.isFinite(data[i]+data[i+1]+data[i+2]));assert(Math.hypot(data[i],data[i+2])<34,'deposit stays inside collection clearance');
+     assert(Math.abs(Math.hypot(data[i+3],data[i+4],data[i+5])-1)<1e-5);
+   }}
+ }
+ assert.equal(signatures.size,13);
+ const variants=new Set();
+ for(let id=0;id<36;id++){calls.length=0;env.HoMoWEnvironment.resource.call(scene,{id,type:'ore_t1',x:500,y:500,charges:3},0);variants.add(calls[0][0]);}
+ assert.equal(variants.size,6,'bounded reproducible deposit variations');
+});
+
+test('architecture and geology textures are deterministic, opaque and distinct',()=>{
+ const env={};env.window=env;vm.createContext(env);vm.runInContext(fs.readFileSync(path.join(__dirname,'materials.js'),'utf8'),env);
+ const signatures=new Set();
+ for(const id of ['wood','steel','plaster','stone','slate','rock','grass','soil','cobble']){
+   const pixels=env.HoMoWMaterials.pixels(id);assert.equal(pixels.length,64*64*4);assert.equal(env.HoMoWMaterials.pixels(id),pixels);
+   for(let i=0;i<pixels.length;i+=4){assert.equal(pixels[i],pixels[i+1]);assert.equal(pixels[i],pixels[i+2]);assert.equal(pixels[i+3],255);}
+   signatures.add(Buffer.from(pixels).toString('base64'));
+ }
+ assert.equal(signatures.size,9);
+});
+
+test('desktop inventory and shops filter without changing slots and trade exact quantities',async()=>{
+ const {parseHTML}=await import('linkedom'),{window}=parseHTML(fs.readFileSync(path.join(__dirname,'index.html'),'utf8')),document=window.document;
+ Object.defineProperty(window.HTMLSelectElement.prototype,'value',{configurable:true,get(){return this.querySelector('option[selected]')?.getAttribute('value')||'';},set(value){for(const o of this.querySelectorAll('option'))o.toggleAttribute('selected',o.getAttribute('value')===String(value));}});
+ window.HTMLElement.prototype.showModal=function(){this.setAttribute('open','');};window.HTMLElement.prototype.close=function(){this.removeAttribute('open');};Object.defineProperty(window.HTMLElement.prototype,'open',{configurable:true,get(){return this.hasAttribute('open');}});
+ const env={document,BrukRealms:require('./core.js'),BrukRealmsArt:{icon:()=>'<svg></svg>'},HoMoWPortrait(){},setTimeout:fn=>{fn();return 1;},clearTimeout(){}};env.window=env;vm.createContext(env);
+ for(const file of ['inventory','panels','market'])vm.runInContext(fs.readFileSync(path.join(__dirname,file+'.js'),'utf8'),env);
+ const w=new World();w.state.resources.copper=12;w.state.resources.iron=5;
+ const root=document.getElementById('inventoryItems'),ui=env.BrukInventory.mount(root,w,{result:fn=>{const result=fn();if(result.ok)ui.render();return result;},notice(){}});ui.render();
+ const original=JSON.stringify(w.state),slots=env.BrukRealms.inventoryLayout(w.state).slice(),visible=()=>[...root.querySelectorAll('.pack-grid .pack-cell')].filter(n=>!n.hidden);
+ root.querySelector('input[type=search]').value='мід';root.querySelector('input[type=search]').oninput();assert.equal(visible().length,1);assert.equal(visible()[0].dataset.itemKey,'resource:copper');
+ visible()[0].click();assert(root.querySelector('.pack-item-meta').textContent.includes('18.0'));assert.equal(root.querySelector('input[type=search]').value,'мід');
+ root.querySelector('input[type=search]').value='немає такого предмета';root.querySelector('input[type=search]').oninput();assert.equal(visible().length,0);
+ root.querySelector('.pack-toolbar button').click();assert.equal(visible().length,slots.length);
+ root.querySelector('.pack-toolbar select').value='tool';root.querySelector('.pack-toolbar select').onchange();assert.equal(visible().length,Object.keys(env.BrukRealms.TOOLS).length);assert(visible().every(n=>n.dataset.kind==='tool'));
+ assert.equal(JSON.stringify(w.state),original);assert.deepEqual(env.BrukRealms.inventoryLayout(w.state),slots);
+ root.querySelector('.pack-toolbar button').click();const empty=slots.findIndex(key=>!key);root.querySelector('.pack-grid [data-slot-index="'+empty+'"]').click();assert.equal(env.BrukRealms.inventoryLayout(w.state)[empty],'resource:copper');
+ Object.assign(w.state,env.BrukRealms.TRADERS.blacksmith);w.state.silver=0;
+ const api={save(){},notice(){},hud(){},clearKeys(){},focus(){}},panels=env.BrukRealmsPanels.create(w,api);panels.town('blacksmith');
+ const stock=document.getElementById('merchantStock'),cards=()=>[...stock.querySelectorAll('[data-stock-category]')].filter(n=>!n.hidden),beforeShop=JSON.stringify(w.state);
+ assert(stock.querySelector('.locked-reason'));stock.querySelector('.shop-toolbar select').value='tools';stock.querySelector('.shop-toolbar select').onchange();assert.equal(cards().length,Object.keys(env.BrukRealms.TOOLS).length);assert(cards().every(c=>c.dataset.stockCategory==='tools'));
+ stock.querySelector('input[type=checkbox]').checked=true;stock.querySelector('input[type=checkbox]').onchange();assert.equal(cards().length,0);assert.equal(JSON.stringify(w.state),beforeShop);
+ w.state.silver=200;panels.refresh();assert(cards().length>0);assert(cards().every(c=>c.querySelector('[data-tool]:not(:disabled)')));document.getElementById('merchantDialog').close();
+ Object.assign(w.state,env.BrukRealms.TRADERS.market);w.state.silver=500;w.state.resources.copper=20;w.state.bank.copper=50;
+ const exchange=document.createElement('div'),marketApi={refresh(){exchange.replaceChildren();env.HoMoWMarket.render(exchange,w,marketApi);},result(fn){const result=fn();if(result.ok)marketApi.refresh();return result;}};marketApi.refresh();
+ const preset=n=>[...exchange.querySelectorAll('.exchange-presets button')].find(b=>b.textContent===n).click();preset('5');const price=w.quote('copper');exchange.querySelector('[data-sell="copper:bag"]').click();assert.equal(w.state.resources.copper,15);assert.equal(w.state.silver,500+5*price);
+ preset('MAX');assert.equal(Number(exchange.querySelector('input[type=number]').value),50);assert(exchange.querySelector('[data-sell="copper:bag"]').disabled);assert(!exchange.querySelector('[data-sell="copper:bank"]').disabled);
+ for(const n of ['-1','0','1.5','1001']){const amount=exchange.querySelector('input[type=number]');amount.value=n;amount.oninput();assert([...exchange.querySelectorAll('.exchange-controls button')].every(b=>b.disabled));}
+ [...exchange.querySelectorAll('.exchange-toolbar button')].find(b=>b.textContent==='Купити').click();preset('5');const buyPrice=Math.ceil(w.quote('copper')*1.3),silver=w.state.silver;exchange.querySelector('.exchange-controls button').click();assert.equal(w.state.bank.copper,55);assert.equal(w.state.resources.copper,15);assert.equal(w.state.silver,silver-5*buyPrice);
+ preset('MAX');assert.equal(Number(exchange.querySelector('input[type=number]').value),Math.min(1000,Math.floor(w.state.silver/buyPrice)));
+ const search=exchange.querySelector('input[type=search]');search.value='немає такого ресурсу';search.oninput();assert.equal(exchange.querySelector('.exchange-controls'),null);
+});
+
 test('a lawful town bind survives saves, death, recall and switching back to the village',()=>{
  const w=new World({passUnlocked:true},()=>.99);Object.assign(w.state,R.CITY_LANDMARKS.inn);
  assert(w.bindHome().ok);const h=new World(w.save(),()=>.99);assert.equal(h.state.homeTown,'city');

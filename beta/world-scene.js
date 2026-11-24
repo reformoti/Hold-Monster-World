@@ -48,7 +48,7 @@ class Scene extends window.HoMoWBeta3D.Scene{
  const staticKey=this.cpu?[this.width,this.height,this.cx,this.cz,this.yaw,this.zoom,this.opt.shadows,this.opt.lowTextures,player.x,player.y,focusY,cluster,w.nodes.map(n=>n.charges).join(',')].join(':'):null;
  if(this.cpu&&staticKey===this.staticKey){this.faces=this.cachedFaces.slice();this.visible=this.cachedVisible;}else{
  this.horizon(w);this.clusterTransition(w);
- const biome=R.clusterAt(w.state.x,w.state.y).biome;this.draw('cube',area.x+area.w/2,-7,area.y+area.h/2,area.w,10,area.h,G.palette[biome].slice(1));if(!cluster.startsWith('dungeon:'))this.meadow(area,biome);this.villageGround(w);this.roads(w);this.cityGround();this.frontiers(w);
+ const biome=R.clusterAt(w.state.x,w.state.y).biome;this.draw('cube',area.x+area.w/2,-7,area.y+area.h/2,area.w,10,area.h,G.palette[biome].slice(1),0,biome==='winter'?'plaster':'grass');if(!cluster.startsWith('dungeon:'))this.meadow(area,biome);this.villageGround(w);this.roads(w);this.cityGround();this.frontiers(w);
  for(const o of R.OBSTACLES){const center={x:o.x+o.w/2,y:o.y+o.h/2};const tree=['pine','oak','birch'].includes(o.betaKind);
   if(tree?!this.tallVisible(center,685,190):!this.tallVisible(center,o.type==='house'?280:135,Math.max(o.w,o.h)))continue;
   this.cover=['hall','inn'].includes(o.type)||o.type==='house'||o.type==='wall'||o.type==='citywall'||o.type==='mountain'||o.type==='dungeonwall';
@@ -57,11 +57,10 @@ class Scene extends window.HoMoWBeta3D.Scene{
   else if(o.type==='house')this.building(o,w.time);
   else if(o.type==='water')this.pond(o,w.time);
   else if(['wall','citywall','dungeonwall'].includes(o.type)){
-    const h=o.type==='wall'?68:o.type==='citywall'?105:82;this.draw('cube',center.x,h/2,center.y,o.w,h,o.h,'939582');
+    this.barrier(o);
   }else if(o.type==='mountain'){
-    // The long pass cliffs fill the same rectangle as the impassable terrain.
-    this.draw('cube',center.x,47,center.y,o.w,94,o.h,'818c80');
-    this.draw('cube',center.x,97,center.y,o.w-3,6,o.h-3,'9da48e');
+    this.draw('cube',center.x,11,center.y,o.w,22,o.h,'818c80',0,'rock');
+    this.boundaryRock(center.x,11,center.y,o.w,92,o.h,window.HoMoWWorldStyle.hash(o.x+':'+o.y),false);
   }
   else this.draw('sphere',center.x,22,center.y,o.w/2,38,o.h/2,G.landscape.rock);this.cover=false;this.visible++;
  }
@@ -75,10 +74,10 @@ class Scene extends window.HoMoWBeta3D.Scene{
  for(const [i,n]of R.GUARDS.entries())if(show(n))this.guard(n,w.time,i);
  this.villageLife(w);
 
- if(!w.state.passUnlocked&&this.visibleAt({x:R.PASS.barrierX,y:R.PASS.y+R.PASS.h/2}))this.draw('cube',R.PASS.barrierX,45,R.PASS.y+R.PASS.h/2,20,90,R.PASS.h,'7a8475');
+ if(!w.state.passUnlocked&&this.visibleAt({x:R.PASS.barrierX,y:R.PASS.y+R.PASS.h/2})){this.cover=true;this.barrier({x:R.PASS.barrierX-10,y:R.PASS.y,w:20,h:R.PASS.h,type:'dungeonwall'});this.cover=false;}
  const run=w.state.expeditions.run,dungeon=R.DUNGEONS.find(d=>d.id===run?.id);
- if(dungeon){for(const gate of dungeon.gates)if(run.stage<gate.stage)this.draw('cube',gate.x+gate.w/2,35,gate.y+gate.h/2,gate.w,70,gate.h,'899c9e');for(const [p,name]of [[dungeon.chest,'E · Скриня'],[dungeon.exit,'E · Вихід']]){this.draw('cube',p.x,15,p.y,32,30,25,'bba36c');this.tag(name,p.x,p.y,65);}}
- for(const p of R.PORTALS){if(![p.a,p.b].includes(cluster)||!this.visibleAt(p,200))continue;const vertical=p.axis==='x';this.cover=true;for(const side of [-1,1])this.draw('cube',p.x+(vertical?0:side*62),55,p.y+(vertical?side*62:0),18,110,18,'a6b0a0');this.draw('cube',p.x,117,p.y,vertical?22:150,14,vertical?150:22,'cab981');this.cover=false;for(const side of [-1,1])this.draw('cube',p.x+(vertical?side*70:0),0,p.y+(vertical?0:side*70),vertical?145:90,1,vertical?90:145,G.landscape.road);const current=R.clusterOf(w.state),to=R.CLUSTERS.find(c=>c.id===(p.a===current?p.b:p.a));this.tag((to?.name||'Перехід')+'\nWASD · пройти / E',p.x,p.y,140,null);}
+ if(dungeon){for(const gate of dungeon.gates)if(run.stage<gate.stage){this.cover=true;this.barrier({...gate,type:'dungeongate'});this.cover=false;}for(const [p,name]of [[dungeon.chest,'E · Скриня'],[dungeon.exit,'E · Вихід']]){this.draw('cube',p.x,15,p.y,32,30,25,'bba36c');this.tag(name,p.x,p.y,65);}}
+ for(const p of R.PORTALS){if(![p.a,p.b].includes(cluster)||!this.visibleAt(p,200))continue;const vertical=p.axis==='x';this.cover=true;this.gateway(p);this.cover=false;this.trail({x:p.x-(vertical?140:0),y:p.y-(vertical?0:140)},{x:p.x+(vertical?140:0),y:p.y+(vertical?0:140)},90,!!p.village);const to=R.CLUSTERS.find(c=>c.id===(p.a===cluster?p.b:p.a));if(Math.hypot(p.x-player.x,p.y-player.y)<270)this.tag((to?.name||'Перехід')+'\nWASD · пройти / E',p.x,p.y,p.village?154:173,null);}
  for(const d of R.DUNGEONS){const p=d.entry;if(p&&show(p)){this.draw('cone',p.x,1,p.y,65,90,60,'566873');this.tag(d.name,p.x,p.y,110);}}
  if(show(R.MONOLITH)){const p=R.MONOLITH;this.draw('cube',p.x,62,p.y,35,124,35,w.state.monolithAwakened?'7fc6ba':'74877b');this.tag('E · Моноліт',p.x,p.y,145);}
  if(show(R.BILLBOARD)){const p=R.BILLBOARD;this.draw('sphere',p.x,0,p.y,110,1,95,'d5c394');for(const dx of [-40,40])this.draw('cube',p.x+dx,37,p.y,7,74,7,'755a3d');this.draw('cube',p.x,56,p.y,90,43,8,'ad8a56');this.draw('roof',p.x,80,p.y,108,14,30,'4e797b');this.tag('E · Дошка пошани',p.x,p.y,85);}
