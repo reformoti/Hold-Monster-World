@@ -1,1 +1,1 @@
-window.BrukRelease=Object.freeze({version:'0.20.0',date:'2026-11-24',name:'3D-бета'});document.querySelectorAll('[data-game-version]').forEach(el=>el.textContent='v0.20.0 · БЕТА');document.title='HoMoW · 3D-бета 0.20.0';
+window.BrukRelease=Object.freeze({version:'0.21.0',date:'2026-11-26',name:'3D-бета'});document.querySelectorAll('[data-game-version]').forEach(el=>el.textContent='v0.21.0 · БЕТА');document.title='HoMoW · 3D-бета 0.21.0';

@@ -65,10 +65,10 @@ function draw(x,z,t,shape,alive,biome,seed=0,time=0){
  const leaves=biome==='winter'?['92a298','b5c3b5','dbe2d3']:v.sp.leaves;
  const colors={bark:v.sp.bark,cut:'bb9e74',stripe:'5d5f57',leaf0:leaves[0],leaf1:leaves[1],leaf2:leaves[2]};
  // Wind bends the whole silhouette about its root; deeper trunks and stumps stay put.
- const gust=alive&&this.opt?.animations!==false?time:0;
+ const animated=alive&&this.opt?.animations!==false,gust=animated?time:0;
  const sway=alive?(.010+(v.seed%7)*.0018)*(v.sp.girth>.036?.55:1):0,phase=(v.seed%97)*.11;
- const lean=Math.sin(gust*1.05+phase)*sway+Math.sin(gust*2.31+phase*2.4)*sway*.34;
- const pitch=Math.cos(gust*.83+phase*1.7)*sway*.72+Math.cos(gust*1.94+phase)*sway*.26;
+ const lean=animated?Math.sin(gust*1.05+phase)*sway+Math.sin(gust*2.31+phase*2.4)*sway*.34:0;
+ const pitch=animated?Math.cos(gust*.83+phase*1.7)*sway*.72+Math.cos(gust*1.94+phase)*sway*.26:0;
  for(const {mesh,slot} of parts)this.draw(mesh,x,0,z,v.height,v.height,v.height,colors[slot],(v.seed%628)*.01,null,pitch,lean);
 }
 window.HoMoWTrees={draw,size};

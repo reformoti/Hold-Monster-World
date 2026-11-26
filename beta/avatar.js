@@ -180,14 +180,31 @@ function draw(view,w){
  const s=w.state,R=window.BrukRealms,look=s.appearance||{},out=s.outfits||{};
  const bare=!!w.appearanceOnly,kind=bare?'body':s.armorKind||'plate';
  const yaw=Math.atan2(w.facing.x,w.facing.y),cs=Math.cos(yaw),sn=Math.sin(yaw);
- const gait=w.gait??(w.walking?1:0),phase=w.footstep||0,step=Math.cos(phase)*gait,lateral=Math.sin(phase)*gait,time=w.time||0,idle=1-gait;
- const breath=Math.sin(time*1.5),bob=(1-Math.cos(phase*2))*.65*gait+idle*breath*.34,sway=lateral*.75+idle*Math.sin(time*.61)*.55,glance=Math.sin(time*.47)*idle,bank=Math.max(-1.5,Math.min(1.5,w.turnRate||0))*.13*gait;
- const width=look.body==='slim'?.89:look.body==='broad'?1.13:1;
+ const gait=w.gait??(w.walking?1:0),time=w.time||0,idle=1-gait;
+ const breath=Math.sin(time*1.5),glance=Math.sin(time*.47)*idle;
+ const width=look.body==='slim'?.89:look.body==='broad'?1.13:1,unit=window.HoMoWScale.human;
+ // The simulation cadence is fixed, so the legs beat a little faster than footstep counts to keep the stride inside the reach of the hip.
+ const cadence=s.mounted?1:1.5,phase=(w.footstep||0)*cadence;
+ const step=Math.cos(phase)*gait,lateral=Math.sin(phase)*gait,sway=lateral*.75+idle*Math.sin(time*.61)*.55,
+   bank=Math.max(-1.5,Math.min(1.5,w.turnRate||0))*.13*gait;
+ // Stance keeps the foot planted, so the pelvis rides at the height that striding leg can actually reach.
+ const hipY=32,thigh=13.9,shin=13.6,slack=.35,bone=thigh+shin-slack,stance=.58;
+ const pace=(w.dashTime>0?570:(s.extras&&R.moveSpeed?R.moveSpeed(s):178))*(w.slowTime>0?.6:1);
+ const stride=s.mounted?0:Math.min(pace*stance*Math.PI/(13*cadence*unit),16)*gait;
+ const cycle=[-1,1].map(d=>{const t=((phase+(d<0?Math.PI:0))%(Math.PI*2)+Math.PI*2)%(Math.PI*2)/(Math.PI*2),
+   swing=t>=stance,progress=swing?(t-stance)/(1-stance):t/stance;
+   return {d,swing,progress,fore:(swing?-Math.cos(progress*Math.PI):1-2*progress)*stride,
+     lift:swing?Math.pow(Math.sin(progress*Math.PI),1.5)*7*gait:0,
+     tilt:s.mounted?0:gait*(swing?-.20*Math.sin(progress*Math.PI):progress<.15?-.12*(1-progress/.15):progress>.82?.18*(progress-.82)/.18:0)};});
+ const plant=n=>{const heel=5.2*Math.cos(n.tilt)+.65*Math.sin(n.tilt),toe=5.2*Math.sin(n.tilt)-.65*Math.cos(n.tilt),
+   dx=n.d*1.15*width+sway*.18,dz=n.d*1.8+.55+n.fore+toe;
+   return n.lift+heel-hipY+Math.sqrt(Math.max(16,bone*bone-dx*dx-dz*dz));};
+ const support=cycle.filter(n=>!n.swing).map(plant);
+ const bob=s.mounted?idle*breath*.3:(support.reduce((a,b)=>a+b,0)/(support.length||1))+idle*breath*.34;
  const pick=(type,key,fallback)=>(R.APPEARANCE[type][key]||fallback).slice(1);
  const palette={skin:({light:'e5b8a2',warm:'d6a18a',bronze:'ab7960',dark:'77503e'})[look.skin]||'dcb197',hair:pick('hair',look.hair,'#513b32'),accent:pick('accent',look.accent,'#77826e'),
    ivory:w.hurt>0?'d99f92':'f0e5cf',linen:'fff1d9',gold:'d7ae6b',darkMetal:'494855',visor:'272633',under:'383941',trouser:'4d4853',boot:'58473e',
    robe:'796d87',binding:'745641',leather:'a77b55',sclera:'f8e8ce',eye:'34342f',lip:'875f50',flame:'f4bc73',page:'eadcc3'};
- const unit=window.HoMoWScale.human;
  const at=([x,y,z])=>[s.x+(x*cs+z*sn)*unit,(y+bob)*unit,s.y+(-x*sn+z*cs)*unit];
  const place=(parts,offset,scale=[1,1,1],turn=0,pitch=0,lean=0,colors=palette)=>{
    const [x,y,z]=at(offset);
@@ -209,25 +226,23 @@ function draw(view,w){
      const color=cape==='guardian_cape'?'ivory':cape==='sage_cape'?'robe':'accent';
      b.rings(color,[[20,13.1,1.6,0,-11.1],[30,14,1.8,0,-10.4],[47,12.8,2.0,0,-8.4],[56.5,8,2.5,0,-5.7]],6);
      b.rings('gold',[[20,13.2,1.72,0,-11.1],[21.6,13.35,1.8,0,-11]],6);
-   },[sway*.42,0,-Math.abs(step)*1.5+idle*Math.sin(time*1.7)*.55],[1,1,1],-step*.05,0,bank*1.4);
+   },[sway*.42,0,-Math.abs(step)*1.4-lateral*1.1+idle*Math.sin(time*1.7)*.55],[1,1,1],-step*.05,0,bank*1.4);
  }
  const feet=bare?'':out.feet||'';
- for(const d of [-1,1]){
-   const cycle=((phase+(d<0?Math.PI:0))%(Math.PI*2)+Math.PI*2)%(Math.PI*2)/(Math.PI*2),stance=.62;
-   const progress=cycle<stance?cycle/stance:(cycle-stance)/(1-stance),swing=cycle>=stance;
-   const stride=stance*Math.PI/(.16*unit),travel=swing?-Math.cos(progress*Math.PI):1-2*progress;
-   const lift=swing?Math.pow(Math.sin(progress*Math.PI),1.5)*7*gait:0;
-   const tilt=s.mounted?0:gait*(swing?-.20*Math.sin(progress*Math.PI):progress<.15?-.12*(1-progress/.15):progress>.82?.18*(progress-.82)/.18:0);
-   const foot=s.mounted?[d*19,4.5,-3]:[d*7.95*width+sway*.18,-bob+lift+Math.max(0,Math.sin(tilt)*11),d*1.8+travel*stride*gait];
-   const ankle=[foot[0],foot[1]+5.2*Math.cos(tilt)+.65*Math.sin(tilt),foot[2]+5.2*Math.sin(tilt)-.65*Math.cos(tilt)],hip=[d*6.8*width,30.6,-.55];
-   const delta=ankle.map((n,i)=>n-hip[i]),distance=Math.hypot(...delta),axis=delta.map(n=>n/distance);
-   const along=Math.max(-16,Math.min(16,(16*16-15.8*15.8+distance*distance)/(2*distance))),bend=Math.sqrt(Math.max(0,16*16-along*along));
-   const forward=[-axis[0]*axis[2],-axis[1]*axis[2],1-axis[2]*axis[2]],length=Math.hypot(...forward);
-   const knee=s.mounted?[d*20,20,9]:hip.map((n,i)=>n+axis[i]*along+forward[i]/length*bend);
+ for(const n of cycle){
+   const d=n.d,hip=[d*6.8*width,30.6,-.55];
+   const foot=s.mounted?[d*19,4.5,-3]:[d*7.95*width+sway*.18,n.lift-bob,d*1.8+n.fore];
+   const ankle=[foot[0],foot[1]+5.2*Math.cos(n.tilt)+.65*Math.sin(n.tilt),foot[2]+5.2*Math.sin(n.tilt)-.65*Math.cos(n.tilt)];
+   const delta=ankle.map((v,i)=>v-hip[i]),wanted=Math.hypot(...delta)||1e-4,axis=delta.map(v=>v/wanted);
+   const short=Math.min(wanted,bone),along=(thigh*thigh-shin*shin+short*short)/(2*short);
+   const bend=Math.sqrt(Math.max(0,thigh*thigh-along*along));
+   const forward=[-axis[0]*axis[2],-axis[1]*axis[2],1-axis[2]*axis[2]],flen=Math.hypot(...forward)||1e-4;
+   const knee=s.mounted?[d*20,20,9]:hip.map((v,i)=>v+axis[i]*along+forward[i]/flen*bend);
+   const joint=s.mounted?ankle:hip.map((v,i)=>v+axis[i]*short),sole=foot.map((v,i)=>v+joint[i]-ankle[i]);
    const key='leg/'+kind+'/'+feet+'/';
    limb(key+'thigh',b=>leg(b,kind,'thigh',feet),knee,hip);
-   limb(key+'shin',b=>leg(b,kind,'shin',feet),ankle,knee);
-   figure(key+'foot',b=>leg(b,kind,'foot',feet),foot,[1,1,1],d*.13,tilt);
+   limb(key+'shin',b=>leg(b,kind,'shin',feet),joint,knee);
+   figure(key+'foot',b=>leg(b,kind,'foot',feet),sole,[1,1,1],d*.13,n.tilt);
  }
  const family=s.weaponKind||'sword',id=R.VARIANTS[s.weaponVariant]?s.weaponVariant:R.DEFAULT_VARIANTS[family]||'sword_broadsword';
  const paired=['sword_dual','daggers_pair','daggers_claws'].includes(id);
@@ -237,8 +252,8 @@ function draw(view,w){
  let pitch=(family==='spear'?.46:family==='sword'?.25:family==='daggers'?.40:.15)+strike*(family==='staff'?.35:.96);
  let lean=(family==='spear'?.33:family==='staff'?.25:.49)+(two?.12:0);
  let turn=(family==='bow'?0:.10)+Math.sin(progress*2*Math.PI)*(family==='axe'?.98:.51);
- let right=[(two&&!paired?6.5:18.2)*width,33.2+strike*4+breath*idle*.22,10.2-step*5.2+strike*7+glance*.5];
- let left=[-18.1*width+sway*.5,32.8+breath*idle*.3,7+step*5.2];
+ let right=[(two&&!paired?6.5:18.2)*width,33.2+strike*4+breath*idle*.22,10.2+strike*7+glance*.5];
+ let left=[-18.1*width+sway*.5,32.8+breath*idle*.3,7];
  const transformed=(p,axis,local,mirror=1)=>{
    const v=F.point(axis,mirror*local[0]*weaponScale,local[1]*weaponScale,local[2]*weaponScale);
    return p.map((n,i)=>n+v[i]);
@@ -255,9 +270,21 @@ function draw(view,w){
      left=[-7,38.5,21+strike*2];right=transformed(left,F.basis(turn,pitch,lean),[0,0,id==='bow_warbow'?-18:-13]);
    }
  }else if(two&&!paired){left=transformed(right,F.basis(turn,pitch,lean),[0,family==='sword'?-8:10,0]);}
- else if(paired)left=[-18*width,33,10.4+step*2+strike*4];
+ else if(paired)left=[-18*width,33,10.4+strike*4];
+ // Arms hang from the shoulder instead of sliding: the hand trails the opposite leg and the elbow only bends forward.
+ const pivot=([x,y,z],[ox,oy,oz],a,b)=>{const ca=Math.cos(a),sa=Math.sin(a),cb=Math.cos(b),sb=Math.sin(b),
+   dy=y-oy,dz=z-oz,rx=x-ox,ry=dy*ca-dz*sa,rz=dy*sa+dz*ca;
+   return[ox+rx*cb+rz*sb,oy+ry,oz-rx*sb+rz*cb];};
+ const armPhase=two&&!paired?1:0,ease=1-strike*.8,reachScale=two||family==='bow'||paired?.3:1;
  for(const side of [-1,1]){
-   const hand=side>0?right:left,shoulder=[side*14.0*width,53.6,.05],elbow=[side*(17.8*width+Math.min(3,Math.abs(hand[0])*.11)),42.4+strike*1.6,hand[2]*.32-2.3];
+   const phase=armPhase?step:side*step,shoulder=[side*14.0*width,53.6,-side*step*.85],
+     turnZ=side*phase*.30*gait*ease*reachScale*(s.mounted?.35:1),
+     flex=-(.05+.34*Math.max(0,-phase))*(1-idle*.6)*gait*reachScale;
+   let hand=side>0?right:left;
+   let elbow=[side*(17.8*width+Math.min(3,Math.abs(hand[0])*.11)),42.4+strike*1.6,hand[2]*.32-2.3];
+   elbow=pivot(elbow,shoulder,0,turnZ);
+   hand=pivot(pivot(hand,shoulder,0,turnZ*.85),elbow,flex,0);
+   if(side>0)right=hand;else left=hand;
    const key='arm/'+kind+'/';
    limb(key+'upper',b=>arm(b,kind,'upper',side),elbow,shoulder);
    limb(key+'lower',b=>arm(b,kind,'lower',side),hand,elbow);
@@ -282,7 +309,7 @@ function draw(view,w){
      const material=slot==='wood'?'wood':slot==='grip'?'leather':slot==='gem'?'rune':null;
      view.draw(mesh,x,y,z,mirror*heldUnit,heldUnit,heldUnit,model.colors[slot],yaw+turn*mirror,material,pitch,lean*mirror);
    }
-   if(enchant){
+   if(enchant&&!view.maskPass){
      const socket=model.tip;
      window.HoMoWBeta3D.enchantEffect(enchant,time,(dx,dy,dz,sx,sy,sz,ink,shape,twist)=>{
        const pos=at(transformed(hand,axis,[socket[0]+dx*.74,socket[1]+(dz-9)*.77,socket[2]+dy*.68],mirror));

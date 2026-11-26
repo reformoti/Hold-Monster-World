@@ -9,6 +9,21 @@
 .encounter-status{margin:.4rem 0 .65rem;color:#d9c9ac;font-variant-numeric:tabular-nums}
 .encounter-status[data-active="true"]::before{content:"◆";color:#ff77b3;margin-inline-end:.45em}
 
+#leaderboardDialog .ranking-row { grid-template-columns:32px minmax(0,1fr) minmax(100px,1.4fr); }
+#leaderboardDialog .ranking-row>b { white-space:normal;line-height:1.5;overflow-wrap:break-word; }
+@media (max-width:899px) {
+  #merchantStock .stock-group { min-width:0;border:1px solid #778b7655;border-radius:7px;margin:8px 0; }
+  #merchantStock .stock-summary { display:flex;align-items:center;gap:12px;padding:12px;cursor:pointer; }
+  #merchantStock .stock-summary>span:not(.gear-art) { display:grid;gap:4px; }
+  #merchantStock .stock-summary small { font-size:11px;opacity:.8; }
+  #merchantStock .stock-detail { padding:12px; }
+  #merchantStock .stock-select { display:grid;gap:6px;margin:8px 0; }
+  #merchantStock .stock-select select { min-width:0;width:100%; }
+  #merchantStock :is(.gear-grid,.recipe-grid,.potion-grid) { grid-template-columns:minmax(0,1fr)!important;align-items:start; }
+  #merchantStock .stock-summary>span:not(.gear-art) { min-width:0;overflow-wrap:anywhere; }
+  #merchantStock .stock-group[open] { grid-column:1/-1; }
+}
+
 /* Desktop command deck. Narrow-screen rules remain inherited from the shared HUD. */
 @media (min-width:900px) {
   body,
@@ -699,6 +714,25 @@
   #merchantStock .resource-row>button { min-height:40px;padding:9px 12px!important;font-size:13px!important; }
   #merchantStock :is(.market-summary,.bank-summary) strong { color:var(--beta-text);font-size:15px; }
   #merchantStock .market-summary small { color:var(--beta-muted);font-size:12px; }
+  #merchantStock .stock-group { min-width:0;border:1px solid var(--beta-line);border-radius:8px;background:linear-gradient(135deg,#284547,#1c3638); }
+  #merchantStock .stock-summary { display:flex;align-items:center;gap:14px;min-height:88px;padding:16px;cursor:pointer;list-style:none; }
+  #merchantStock .stock-summary::-webkit-details-marker { display:none; }
+  #merchantStock .stock-summary::after { content:'+';margin-left:auto;color:var(--beta-gold);font-size:24px; }
+  #merchantStock .stock-group[open]>.stock-summary::after { content:'−'; }
+  #merchantStock :is(.gear-grid,.recipe-grid) { align-items:start; }
+  #merchantStock .stock-group[open] { grid-column:1/-1; }
+  #merchantStock .stock-group[open]>.stock-summary { border-bottom:1px solid var(--beta-line); }
+  #merchantStock .stock-summary:focus-visible { outline:2px solid var(--beta-gold);outline-offset:2px; }
+  #merchantStock .stock-summary>.gear-art { width:52px;height:52px;flex:0 0 52px; }
+  #merchantStock .stock-summary>span:not(.gear-art) { display:grid;gap:5px; }
+  #merchantStock .stock-summary strong { color:var(--beta-text);font-size:17px; }
+  #merchantStock .stock-summary small { color:var(--beta-muted);font-size:12px; }
+  #merchantStock .stock-detail { padding:14px; }
+  #merchantStock .stock-detail>.gear-card,#merchantStock .stock-detail>.potion-card,#merchantStock .stock-detail>.recipe-card { border:0!important;padding:10px 0!important;background:none!important; }
+  #merchantStock .stock-select { display:grid;gap:7px;margin-bottom:12px;color:var(--beta-gold);font-size:12px; }
+  #merchantStock .stock-select select { width:100%;min-width:0; }
+  #merchantStock .stock-stat-title { color:var(--beta-gold);font-size:13px; }
+  #leaderboardDialog .ranking-row>b { white-space:normal;line-height:1.5;overflow-wrap:break-word; }
   #merchantStock .shop-toolbar {display:grid;grid-template-columns:minmax(160px,1fr) auto auto;gap:10px;align-items:center;margin:4px 0 16px;padding:12px;border:1px solid var(--beta-line);border-radius:7px;background:#102b2d;}
   #merchantStock .shop-toolbar input[type=search] {min-width:0;width:100%;}
   #merchantStock .shop-toolbar label {display:flex;align-items:center;gap:8px;white-space:nowrap;}

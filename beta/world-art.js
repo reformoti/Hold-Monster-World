@@ -439,7 +439,7 @@ window.HoMoWEnvironment={
  },
  guard(n,time,index){const sway=this.opt?.animations===false?0:Math.sin(time*.9+index)*.02;this.hero({state:{x:n.x,y:n.y,weaponKind:'spear',armorKind:'plate',supportKind:'shield',appearance:{beard:'none'},outfits:{head:'soldier_helm'}},facing:{x:.9,y:.25+sway},walking:false,footstep:0,time,swing:0,hurt:0});this.draw('cube',n.x,62,n.y,5,12,15,index?'daa844':'3f9dbc');this.draw('cube',n.x-11,34,n.y+10,2,12,10,'4c82a6');this.tag(index?'Вартовий брами':'Капітан варти',n.x,n.y,74,null);},
  villageLife(w){const R=window.BrukRealms;if(!R.inVillage(w.state.x,w.state.y))return;const time=this.opt?.animations===false?0:w.time;
- for(let [i,a]of [[0,{x:535,y:640}],[1,{x:750,y:730}],[2,{x:340,y:340}]]){a=window.HoMoWVillage.spread({...a});const p={x:a.x+Math.sin(time*.18+i)*15,y:a.y+Math.cos(time*.18+i)*12};if(!R.blocked(p.x,p.y,20)&&this.visibleAt(p))this.trader(p,['market','alchemist','quartermaster'][i],time);}
+ for(let [i,a]of [[0,{x:535,y:640}],[1,{x:750,y:730}],[2,{x:340,y:340}]]){a=window.HoMoWVillage.spread({...a});const q=time*.18+i,p={x:a.x+Math.sin(q)*15,y:a.y+Math.cos(q)*12};if(!R.blocked(p.x,p.y,20)&&this.visibleAt(p))this.trader(p,['market','alchemist','quartermaster'][i],time,{walking:time>0,gait:.34,footstep:time*.9,facing:{x:Math.cos(q)*15,y:-Math.sin(q)*12}});}
  }
 };
 function RBiome(p){return window.BrukRealms.clusterAt(p.x,p.y).biome;}

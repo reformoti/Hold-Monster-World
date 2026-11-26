@@ -4,7 +4,7 @@ import re
 import subprocess
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
-VERSION = '0.20.0'
+VERSION = '0.21.0'
 
 def replace_once(text, old, new):
     if text.count(old) != 1:
@@ -60,6 +60,15 @@ if(!found){s.x=SPAWN.x;s.y=SPAWN.y;}}""")
     html = re.sub(r'src="../homow-options\.js[^"]*"', 'src="options.js?v='+VERSION+'"', html)
     options = (ROOT / 'homow-options.js').read_text().replace("KEY='homow_options_v1'", "KEY='homow_beta_options_v1'").replace("['uk','en','de','pt'].includes(r.locale)", "r.locale==='uk'")
     (HERE / 'options.js').write_text(options)
+    community = (ROOT / 'homow-community.js').read_text()
+    community = replace_once(community, "session:'Нон-стоп · секунди'", "session:'Нон-стоп · час'")
+    community = replace_once(community, 'function drawBoard(){', '''const timePlural=new Intl.PluralRules('uk-UA');
+function sessionTime(value){let minutes=Math.floor(Math.max(0,Number(value)||0)/60);if(!minutes)return 'менше хвилини';const parts=[];
+for(const [size,words]of [[1440,{one:'день',few:'дні',many:'днів'}],[60,{one:'година',few:'години',many:'годин'}],[1,{one:'хвилина',few:'хвилини',many:'хвилин'}]]){const n=Math.floor(minutes/size);minutes%=size;if(n)parts.push(n.toLocaleString('uk-UA')+' '+words[timePlural.select(n)]);}return parts.join(' ');}
+function drawBoard(){''')
+    community = replace_once(community, "el('b',Number(r.value).toLocaleString('uk-UA'))", "el('b',category==='session'?sessionTime(r.value):Number(r.value).toLocaleString('uk-UA'))")
+    (HERE / 'community.js').write_text(community)
+    html = re.sub(r'src="../homow-community\.js[^"]*"', 'src="community.js?v='+VERSION+'"', html)
     atlas = (HERE / 'atlas-source.js').read_text()
     footer = "c.restore();c.fillStyle='#152324dc';c.fillRect(0,bh-16,bw,16);c.fillStyle='#f1dfb0';c.font='9px system-ui';c.textAlign='center';c.fillText(dungeon?dungeon.name:cluster.name+' · T'+cluster.tier,bw/2,bh-5);"
     atlas = atlas.replace(footer, 'c.restore();')
@@ -69,14 +78,97 @@ if(!found){s.x=SPAWN.x;s.y=SPAWN.y;}}""")
     panels = replace_once(panels, "if(townTab==='quartermaster'){", "if(townTab==='quartermaster'){root.append(el('h3','market-section-title','Місце відродження'),el('p','','Прив’язано: '+world.homeName()),button('Прив’язати до цього поселення',()=>result(()=>world.bindHome()),s.homeTown===(R.inCity(s.x,s.y)?'city':'village')));")
     panels = replace_once(panels, "if(o&&!o.complete){card.append(description(Object.entries(o.input)", "if(o&&!o.complete){if(!o.available)card.append(description('Для цього рангу потрібна міська рунна майстерня.'));else if(world.state.silver<o.cost)card.append(description('Бракує срібла: '+(o.cost-world.state.silver)));card.append(description(Object.entries(o.input)")
     panels = replace_once(panels, "R.RESOURCES[key].name+' ×'+n).join(' · ')));const b=button('Зачарувати", "R.RESOURCES[key].name+' '+(world.state.resources[key]+world.state.bank[key])+'/'+n).join(' · ')));const b=button('Зачарувати")
-    panels = replace_once(panels, "inventorySlot='variant';", "inventorySlot='variant',stockQuery='',stockCategory='all',stockAvailable=false;")
+    panels = replace_once(panels, "inventorySlot='variant';", "inventorySlot='variant',stockQuery='',stockCategory='all',stockAvailable=false;const stockOpen=new Map(),stockChoice=new Map(),stockTiers=new Map();")
+    panels = replace_once(panels, "tools:'Інструменти'", "tools:'Інструменти',recipes:'Матеріали',potions:'Зілля',mounts:'Скакуни'")
+    panels = replace_once(panels, '    function itemCard(', '''    function stockGroup(key,name,icon,slot,entries){
+      const group=el('details','stock-group'),summary=el('summary','stock-summary'),copy=el('span',''),body=el('div','stock-detail');
+      group.dataset.stockGroup=key;group.dataset.stockCategory=slot;group.dataset.stockName=[name,...entries.map(e=>e.name)].join(' ');
+      group.dataset.stockAvailable=String(entries.some(e=>e.card.querySelector('button:not(:disabled)')));
+      summary.append(art(icon),copy);copy.append(el('strong','',name),el('small','','Варіант, тир і характеристики'));group.append(summary,body);
+      summary.onclick=()=>stockOpen.set(key,!group.open);
+      const selected=entries.find(e=>e.id===stockChoice.get(key))||entries[0];
+      if(entries.length>1){const label=el('label','stock-select','Варіант / тир'),select=el('select');select.dataset.stockVariant=key;select.setAttribute('aria-label','Варіант: '+name);
+        for(const entry of entries){const option=el('option','',entry.name);option.value=entry.id;select.append(option);}select.value=selected.id;
+        select.onchange=()=>{stockChoice.set(key,select.value);refresh();};label.append(select);body.append(label);
+      }
+      for(const entry of entries)delete entry.card.dataset.stockCategory;
+      body.append(selected.card);group.toggleAttribute('open',stockOpen.get(key)||false);
+      group.addEventListener('toggle',()=>{if(group.isConnected)stockOpen.set(key,group.open);});return group;
+    }
+    function stockKey(slot,kind){return slot==='variant'?R.VARIANTS[kind].family:slot==='outfit'?R.OUTFITS[kind].slot:kind;}
+    function groupGear(grid,slot,list,forge,enchant=false){
+      const groups=new Map();for(const kind of list){const key=stockKey(slot,kind);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(kind);}
+      for(const [key,kinds]of groups){const first=catalogs[slot][kinds[0]],name=slot==='variant'?R.FAMILIES[key].name:slot==='outfit'?{head:'Шоломи',feet:'Взуття',cloak:'Плащі'}[key]:first.name;
+        const entries=kinds.map(kind=>({id:kind,name:catalogs[slot][kind].name,card:enchant?enchantCard(slot,kind):itemCard(slot,kind,forge)}));
+        grid.append(stockGroup(townTab+':'+workshopMode+':'+slot+':'+key,name,slot==='variant'?key:slot==='outfit'?kinds[0]:first.icon||key,slot,entries));
+      }
+    }
+    function resourceGroup(id){const r=R.RESOURCES[id];return r?.family?r.family+(id.endsWith('_refined')?'_refined':''):id;}
+    function groupResources(grid,entries,slot){const groups=new Map();for(const entry of entries){const key=resourceGroup(entry.id);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(entry);}
+      for(const [key,list]of groups){const first=list[0],r=R.RESOURCES[first.id],name=r?r.name.split(' · ')[0]:first.name;grid.append(stockGroup(townTab+':'+slot+':'+key,name,r?.family==='ore'?'iron':r?.family||first.id,slot,list));}
+    }
+    function itemCard(''')
+    panels = replace_once(panels, 'offer=R.gearOffer(s,slot,kind),owned=mapFor(slot)[kind],', "owned=mapFor(slot)[kind],next=R.gearOffer(s,slot,kind),tier=inventoryOnly?owned:(stockTiers.get(slot+':'+kind)??Math.min(next.tier,next.max)),mapName={variant:'variantArsenal',outfit:'outfitLevels',armor:'wardrobe',support:'supports',extra:'extras'}[slot],offer=R.gearOffer({...s,[mapName]:{...mapFor(slot),[kind]:tier-1}},slot,kind),")
     panels = replace_once(panels, "head.append(art(['variant','outfit']", "card.dataset.stockCategory=slot;card.dataset.stockName=item.name;head.append(art(['variant','outfit']")
-    panels = replace_once(panels, "if(!offer.available)card.append(el('small','locked-reason',offer.reason));", "if(!offer.available)card.append(el('small','locked-reason',offer.reason));else if(s.silver<(forge?offer.fee:offer.cost))card.append(el('small','locked-reason','Бракує срібла: '+((forge?offer.fee:offer.cost)-s.silver)));" )
-    panels = replace_once(panels, "const head=el('div','gear-card-head'),text=el('div','');head.append(art(kind,tier)", "card.dataset.stockCategory='tools';card.dataset.stockName=item.name;const head=el('div','gear-card-head'),text=el('div','');head.append(art(kind,tier)")
+    panels = replace_once(panels, '?kind:item.icon||kind,owned)', '?kind:item.icon||kind,tier)')
+    panels = replace_once(panels, 'card.append(head,description(item.description||item.role));', '''card.append(head,description(item.description||item.role));
+      if(!inventoryOnly){const label=el('label','stock-select','Тир спорядження'),select=el('select');select.dataset.stockTier=slot+':'+kind;select.setAttribute('aria-label','Тир: '+item.name);
+        for(let t=0;t<=next.max;t++){const option=el('option','',`T${t}`+(t===owned?' · у колекції':t===next.tier?' · наступний':''));option.value=String(t);select.append(option);}select.value=String(tier);
+        select.onchange=()=>{stockTiers.set(slot+':'+kind,Number(select.value));refresh();};label.append(select);card.append(label);
+      }
+      card.append(el('strong','stock-stat-title',`Характеристики · T${tier}.${R.enchantLevel(s,slot,kind)}`));''')
+    panels = replace_once(panels, 'Math.max(0,owned)).toFixed(1)', 'tier).toFixed(1)')
+    panels = replace_once(panels, "if(slot==='support'&&!R.offhandActive(s))", '''if(slot==='variant'){const preview={...s,weaponKind:item.family,weaponVariant:kind,weapon:tier};card.append(description(`Шкода персонажа: ${R.attack(preview)} · дальність: ${R.weaponRange(preview).toFixed(0)} · інтервал: ${R.attackInterval(preview).toFixed(2)} с`));}
+      if(slot==='armor')card.append(description('Здоров’я від броні: +'+(tier*item.hp+R.enchantLevel(s,slot,kind)*18)));
+      if(slot==='outfit'){const factor=(tier+1)*(1+R.enchantLevel(s,slot,kind)*.08);for(const [key,label]of Object.entries({hp:'Здоров’я',mana:'Мана',speed:'Швидкість',damage:'Шкода',crit:'Критичний удар',dodge:'Ухилення'}))if(item[key])card.append(description(label+': +'+(key==='hp'||key==='mana'?(item[key]*factor).toFixed(0):(item[key]*factor*100).toFixed(1)+'%')));}
+      if(slot==='support')card.append(description(kind==='shield'?'Захист: '+R.itemProtection(slot,kind,tier).toFixed(1)+'%':kind==='focus'?`Магічна шкода: +${tier*5}% · мана: +${tier*12}`:`Швидкість атак: +${tier*4}%`));
+      if(slot==='extra')card.append(description(kind==='bag'?`Місткість: +${tier*50}`:kind==='boots'?`Рух: +${tier*4}% · здоров’я: +${tier*5}`:`Мана: +${tier*12} · досвід: +${tier*3}%`));
+      if(slot==='support'&&!R.offhandActive(s))''')
+    panels = replace_once(panels, "if(offer.complete)card.append", "if(next.complete)card.append")
+    panels = replace_once(panels, '`Наступний · T${offer.tier}`', '`Обраний · T${offer.tier}`')
+    panels = replace_once(panels, "if(!offer.available)card.append(el('small','locked-reason',offer.reason));", "if(tier!==next.tier)card.append(el('small','locked-reason',tier<=owned?'Цей тир уже у колекції.':'Покращення послідовне: спочатку T'+next.tier));else if(!offer.available)card.append(el('small','locked-reason',offer.reason));else if(s.silver<(forge?offer.fee:offer.cost))card.append(el('small','locked-reason','Бракує срібла: '+((forge?offer.fee:offer.cost)-s.silver)));")
+    panels = replace_once(panels, "()=>result(()=>world.buyGear(slot,kind,forge)),!offer.available", "()=>{if(tier!==R.gearOffer(world.state,slot,kind).tier)return;stockTiers.delete(slot+':'+kind);result(()=>world.buyGear(slot,kind,forge));},tier!==next.tier||!offer.available")
+    panels = replace_once(panels, "if(slot!=='extra'&&owned>=0)", "if(slot!=='extra'&&owned>=0&&tier===owned)")
+    panels = replace_once(panels, 'grid.append(card);}root.append(grid);}\n    function materials', "grid.append(stockGroup(townTab+':tools:'+kind,item.name,kind,'tools',[{id:kind,name:item.name,card}]));}root.append(grid);}\n    function materials")
+    panels = replace_once(panels, 'const grid=el(\'div\',\'recipe-grid\');for(const [id,r]', "const grid=el('div','recipe-grid'),entries=[];for(const [id,r]")
+    panels = replace_once(panels, 'grid.append(card);}root.append(grid);}\n    function amount', "entries.push({id,name:r.name,card});}groupResources(grid,entries,'recipes');root.append(grid);}\n    function amount")
+    panels = replace_once(panels, "for(const kind of list)grid.append(itemCard(slot,kind,workshopMode==='craft'));", "groupGear(grid,slot,list,workshopMode==='craft');")
+    start = panels.index('    function enchanting(')
+    end = panels.index('    function selling(', start)
+    enchanting = panels[start:end]
+    card_start = enchanting.index('const card=itemCard(')
+    card_end = enchanting.index('grid.append(card);', card_start)
+    enchant_card = enchanting[card_start:card_end]
+    panels = panels[:start]+"    function enchantCard(slot,kind){"+enchant_card+"return card;}\n    function enchanting(root){root.append(description('Зачарування незалежне від тиру. Успіх гарантований, речі не зникають.'));const grid=el('div','gear-grid');for(const slot of Object.keys(catalogs)){const list=Object.keys(catalogs[slot]).filter(kind=>mapFor(slot)[kind]>=0);groupGear(grid,slot,list,false,true);}if(!grid.children.length)root.append(description('Спочатку придбай спорядження у майстра.'));root.append(grid);}\n"+panels[end:]
+    panels = replace_once(panels, "if(window.HoMoWProfile)window.HoMoWProfile.potions(root,world,result);", "potions(root);")
+    panels = replace_once(panels, "root.append(button((s.mounts[id]?'✓ ':'')+m.name+' · '+m.hp+' HP · ×'+m.speed+' · ◈ '+m.cost,()=>result(()=>world.buyMount(id)),s.mounts[id]||s.silver<m.cost));", "{const card=el('article','gear-card');card.append(description(m.hp+' HP · швидкість ×'+m.speed+' · захист '+m.protection+'%'),button((s.mounts[id]?'✓ Придбано':'Придбати')+' · ◈ '+m.cost,()=>result(()=>world.buyMount(id)),s.mounts[id]||s.silver<m.cost));root.append(stockGroup(townTab+':mounts:'+id,m.name,'mount_'+id,'mounts',[{id,name:m.name,card}]));}")
+    start = panels.index('    function tools(')
+    end = panels.index('    function materials(', start)
+    panels = panels[:start]+'''    function tools(root){const grid=el('div','gear-grid');for(const [kind,item]of Object.entries(R.TOOLS)){
+      const current=world.state.tools[kind],tier=stockTiers.get('tool:'+kind)??Math.min(current+1,8),cost=tier===0?0:([130,420,1150][tier-1]??Math.round(1150*Math.pow(1.7,tier-3))),card=el('article','gear-card'),head=el('div','gear-card-head'),copy=el('div','');
+      head.append(art(kind,tier),copy);copy.append(el('small','',`У КОЛЕКЦІЇ · T${current}`),el('h3','',item.name));card.append(head,description(item.description));
+      const label=el('label','stock-select','Тир інструмента'),select=el('select');select.dataset.stockTier='tool:'+kind;select.setAttribute('aria-label','Тир: '+item.name);
+      for(let t=0;t<=8;t++){const option=el('option','',`T${t}`+(t===current?' · у колекції':t===current+1?' · наступний':''));option.value=String(t);select.append(option);}select.value=String(tier);select.onchange=()=>{stockTiers.set('tool:'+kind,Number(select.value));refresh();};label.append(select);card.append(label,description(`Ранг T${tier} · ресурси до T${Math.min(8,tier+1)}`));
+      if(tier!==current+1&&current<8)card.append(el('small','locked-reason',tier<=current?'Цей тир уже відкрито.':'Покращення послідовне: спочатку T'+(current+1)));
+      const b=button(current===8?'Максимум':`Поліпшити до T${tier} · ◈ ${cost}`,()=>{if(tier!==world.state.tools[kind]+1)return;stockTiers.delete('tool:'+kind);result(()=>world.upgradeTool(kind));},current===8||tier!==current+1||world.state.silver<cost);b.dataset.tool=kind;card.append(b);grid.append(stockGroup(townTab+':tools:'+kind,item.name,kind,'tools',[{id:kind,name:item.name,card}]));
+    }root.append(grid);}
+'''+panels[end:]
+    panels = replace_once(panels, "mounts:'Скакуни'", "mounts:'Скакуни',storage:'Сховище',conversion:'Матеріали для кузні'")
+    panels = replace_once(panels, "const list=el('div','resource-list');for(const [id,r] of Object.entries(R.RESOURCES)){if(!s.bank[id]", "const list=el('div','gear-grid'),entries=[];for(const [id,r] of Object.entries(R.RESOURCES)){if(!s.bank[id]")
+    panels = replace_once(panels, "row.append(resourceArt(id),copy,b);list.append(row);", "row.append(resourceArt(id),copy,b);entries.push({id,name:r.name,card:row});")
+    panels = replace_once(panels, "if(!list.children.length)list.append(description('Сховище поки порожнє.", "groupResources(list,entries,'storage');if(!list.children.length)list.append(description('Сховище поки порожнє.")
+    panels = replace_once(panels, "root.append(button('Зілля здоров’я · ◈ 35',()=>result(()=>world.buy('potion')),s.silver<35||s.potions>=R.STACK_SIZE));", "{const card=el('article','potion-card');card.append(description('Дорожнє зілля здоров’я · окремий запас'),button('Придбати · ◈ 35',()=>result(()=>world.buy('potion')),s.silver<35||s.potions>=R.STACK_SIZE));root.append(stockGroup(townTab+':potions:legacy','Дорожнє зілля','potion','potions',[{id:'legacy',name:'Дорожнє зілля',card}]));}")
+    panels = replace_once(panels, "for(const [id,r] of Object.entries(R.RESOURCES))if(id.endsWith('_refined')&&s.bank[id])root.append(button('Матеріал для кузні: '+r.name+' ×1',()=>result(()=>world.convertMaterial(id,1))));", "const grid=el('div','gear-grid'),entries=[];for(const [id,r]of Object.entries(R.RESOURCES))if(id.endsWith('_refined')&&s.bank[id]){const card=el('article','recipe-card');card.append(description(r.name+' · у сховищі '+s.bank[id]),button('Матеріал для кузні · ×1',()=>result(()=>world.convertMaterial(id,1))));entries.push({id,name:r.name,card});}groupResources(grid,entries,'conversion');root.append(grid);")
+    panels = replace_once(panels, '    function selling(', '''    function potions(root){const s=world.state,grid=el('div','gear-grid'),groups=new Map();for(const p of Object.values(R.POTIONS)){if(!groups.has(p.kind))groups.set(p.kind,[]);const card=el('article','potion-card');card.append(el('h3','',p.name),description(p.description),description(['health','energy'].includes(p.kind)?'Відновлення: +'+p.power:`Ефект: +${Math.round(p.power*100)}% · ${p.duration} с`),el('small','',`У сумці: ${s.consumables[p.id]||0}`));
+        const mats=el('div','recipe-materials');for(const [id,n]of Object.entries(p.input))mats.append(el('span',s.resources[id]+s.bank[id]>=n?'':'missing',R.RESOURCES[id].name+' '+(s.resources[id]+s.bank[id])+'/'+n));card.append(mats);
+        card.append(button('Придбати · ◈ '+p.price,()=>result(()=>world.buyPotion(p.id,1)),s.silver<p.price||s.consumables[p.id]>=R.STACK_SIZE),button('Зварити',()=>result(()=>world.craftPotion(p.id,1)),!world.canConsume(p.input)||s.consumables[p.id]>=R.STACK_SIZE),button(s.potionSlot===p.id?'На Q':'У слот Q',()=>result(()=>world.selectPotion(p.id)),s.potionSlot===p.id));groups.get(p.kind).push({id:p.id,name:p.name,card});
+      }for(const [kind,entries]of groups)grid.append(stockGroup(townTab+':potions:'+kind,entries[0].name.split(' · ')[0],'potion','potions',entries));root.append(grid);
+    }
+    function selling(''')
     panels = replace_once(panels, "root.scrollTop=scroll;}",  """if(root.querySelector('[data-stock-category]')){
 const bar=el('div','shop-toolbar'),search=el('input'),select=el('select'),label=el('label'),available=el('input'),count=el('small','shop-filter-count');search.type='search';search.placeholder='Пошук спорядження';search.value=stockQuery;search.setAttribute('aria-label','Пошук у майстра');
 const present=new Set([...root.querySelectorAll('[data-stock-category]')].map(card=>card.dataset.stockCategory));for(const [id,name]of Object.entries({all:'Усі категорії',...categories})){if(id!=='all'&&!present.has(id))continue;const option=el('option','',name);option.value=id;select.append(option);}if(!present.has(stockCategory))stockCategory='all';select.value=stockCategory;select.setAttribute('aria-label','Категорія спорядження');available.type='checkbox';available.checked=stockAvailable;label.append(available,document.createTextNode('Доступні дії'));
-const apply=()=>{stockQuery=search.value;stockCategory=select.value;stockAvailable=available.checked;const q=stockQuery.trim().toLocaleLowerCase('uk-UA');let shown=0,total=0;for(const card of root.querySelectorAll('[data-stock-category]')){total++;const active=card.querySelector('[data-buy-gear]:not(:disabled),[data-forge-gear]:not(:disabled),[data-enchant]:not(:disabled),[data-tool]:not(:disabled)');const visible=(!q||card.dataset.stockName.toLocaleLowerCase('uk-UA').includes(q))&&(stockCategory==='all'||stockCategory===card.dataset.stockCategory)&&(!stockAvailable||active);card.hidden=!visible;if(visible)shown++;}for(const grid of root.querySelectorAll('.gear-grid')){grid.hidden=![...grid.children].some(card=>!card.hidden);if(grid.previousElementSibling?.classList.contains('market-section-title'))grid.previousElementSibling.hidden=grid.hidden;}count.textContent=shown+' / '+total+' предметів';};search.oninput=select.onchange=available.onchange=apply;bar.append(search,select,label,count);root.prepend(bar);apply();
+const apply=()=>{stockQuery=search.value;stockCategory=select.value;stockAvailable=available.checked;const q=stockQuery.trim().toLocaleLowerCase('uk-UA');let shown=0,total=0;for(const card of root.querySelectorAll('[data-stock-category]')){total++;const active=card.dataset.stockAvailable==='true';const visible=(!q||card.dataset.stockName.toLocaleLowerCase('uk-UA').includes(q))&&(stockCategory==='all'||stockCategory===card.dataset.stockCategory)&&(!stockAvailable||active);card.hidden=!visible;if(visible)shown++;}for(const grid of root.querySelectorAll('.gear-grid')){grid.hidden=![...grid.children].some(card=>!card.hidden);if(grid.previousElementSibling?.classList.contains('market-section-title'))grid.previousElementSibling.hidden=grid.hidden;}count.textContent=shown+' / '+total+' предметів';};search.oninput=select.onchange=available.onchange=apply;bar.append(search,select,label,count);root.prepend(bar);apply();
 }root.scrollTop=scroll;}""")
     (HERE / 'panels.js').write_text(panels.rstrip()+'\n')
     html = re.sub(r'src="../realms-panels\.js[^"]*"', 'src="panels.js?v='+VERSION+'"', html)
@@ -91,7 +183,7 @@ const apply=()=>{stockQuery=search.value;stockCategory=select.value;stockAvailab
     (HERE / 'music.js').write_text(music)
     html = re.sub(r'src="../homow-music\.js[^"]*"', 'src="music.js?v='+VERSION+'"', html)
     html = re.sub(r'src="../release\.js[^"]*"', 'src="release.js?v='+VERSION+'"', html)
-    (HERE / 'release.js').write_text("window.BrukRelease=Object.freeze({version:'"+VERSION+"',date:'2026-11-24',name:'3D-бета'});document.querySelectorAll('[data-game-version]').forEach(el=>el.textContent='v"+VERSION+" · БЕТА');document.title='HoMoW · 3D-бета "+VERSION+"';\n")
+    (HERE / 'release.js').write_text("window.BrukRelease=Object.freeze({version:'"+VERSION+"',date:'2026-11-26',name:'3D-бета'});document.querySelectorAll('[data-game-version]').forEach(el=>el.textContent='v"+VERSION+" · БЕТА');document.title='HoMoW · 3D-бета "+VERSION+"';\n")
     inventory = (ROOT / 'homow-inventory.js').read_text()
     start = inventory.index('function preview(')
     end = inventory.index('function change(', start)
@@ -120,8 +212,17 @@ const load=el('progress','pack-load');load.max=R.capacity(s);load.value=R.weight
     (HERE / 'hud.js').write_text(hud)
     html = re.sub(r'src="../realms-hud\.js[^"]*"', 'src="hud.js?v='+VERSION+'"', html)
     market = (ROOT / 'homow-market.js').read_text()
-    market = replace_once(market, "const r=R.RESOURCES[selected];", "if(filtered.length&&!filtered.some(([id])=>id===selected))selected=filtered[0][0];if(!filtered.length){detail.append(make('p','','Змініть фільтри, щоб вибрати ресурс.'));return;}const r=R.RESOURCES[selected];")
-    market = replace_once(market, "const header=make('div','exchange-row exchange-head');", "if(!filtered.some(([id])=>id===selected)&&filtered.length)selected=filtered[0][0];const header=make('div','exchange-row exchange-head');")
+    market = replace_once(market, "selected='copper'", 'selected=null')
+    market = replace_once(market, "const header=make('div','exchange-row exchange-head');", "const groupOf=(id,r)=>r.family?r.family+(id.endsWith('_refined')?'_refined':''):id,groups=new Map();for(const entry of filtered){const key=groupOf(...entry);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(entry);}if(!filtered.some(([id])=>id===selected))selected=null;const header=make('div','exchange-row exchange-head');")
+    start = market.index('for(const [id,r] of filtered){')
+    end = market.index('if(!filtered.length)list.append', start)
+    market = market[:start]+'''for(const [key,entries]of groups){const [id,r]=entries[0],b=button('',()=>{selected=id;api.refresh();});b.className='exchange-row'+(entries.some(([kind])=>kind===selected)?' selected':'');b.dataset.marketItem=id;b.dataset.marketGroup=key;
+const name=make('span','exchange-item'),icon=make('i');icon.innerHTML=A.icon(r.family==='ore'?'iron':r.family||id,r.tier||0);name.append(icon,make('strong','',r.name.split(' · ')[0]));
+const prices=entries.map(([kind])=>mode==='buy'?Math.ceil(world.quote(kind)*1.3):world.quote(kind)),low=Math.min(...prices),high=Math.max(...prices);
+b.append(name,make('span','tier-tag',String(entries.length)),make('span','',String(entries.reduce((n,[kind])=>n+s.bank[kind]+s.resources[kind],0))),make('b','',low===high?String(low):low+'–'+high));list.append(b);}'''+market[end:]
+    market = replace_once(market, "['ПРЕДМЕТ','ТИР','У ТЕБЕ','ЦІНА / ШТ.']", "['ТИП ПРЕДМЕТА','ВАР.','У ТЕБЕ','ЦІНА / ШТ.']")
+    market = replace_once(market, 'const r=R.RESOURCES[selected];if(!r)return;', '''if(selected===null){detail.append(make('p','','Обери тип предмета, щоб розгорнути тири, характеристики й торгівлю.'));return;}
+const r=R.RESOURCES[selected],entries=groups.get(groupOf(selected,r));if(entries.length>1){const label=make('label','stock-select','Тир ресурсу'),select=make('select');select.setAttribute('aria-label','Тир ресурсу');for(const [id,item]of entries){const option=make('option','',item.name);option.value=id;select.append(option);}select.value=selected;select.onchange=()=>{selected=select.value;api.refresh();};label.append(select);detail.append(label);}''')
     market = replace_once(market, "const amount=make('input');", "const presets=make('div','exchange-presets');for(const n of [1,5,10,100])presets.append(button(String(n),()=>{amount.value=n;update();}));presets.append(button('MAX',()=>{const price=mode==='buy'?Math.ceil(world.quote(selected)*1.3):world.quote(selected);amount.value=Math.max(1,Math.min(1000,mode==='buy'?Math.floor(s.silver/price):Math.max(s.resources[selected],s.bank[selected])));update();}));detail.append(presets);const amount=make('input');")
     market = replace_once(market, "const b=button('Продати '+name.toLowerCase(),", "const b=button('Продати '+name.toLowerCase()+' · '+qty+' → ◈ '+(valid?qty*price:0),")
     market = replace_once(market, "'Купити → у сховище',", "'Купити '+qty+' → у сховище',")

@@ -1,6 +1,6 @@
 /* Applied only inside the beta document, before the canonical simulation is built. */
 (()=>{'use strict';const D=window.BrukRealmsData;
-const layout={blacksmith:[130,155,170,125,265,330],mage:[535,120,110,125,585,290],enchanter:[740,240,120,105,800,390],armorer:[100,425,130,110,260,500],alchemist:[615,545,115,100,660,705],artificer:[200,690,130,90,360,735],quartermaster:[440,730,120,100,590,790],market:[330,390,110,80,415,530]};
+const layout={blacksmith:[130,155,170,125,265,330],mage:[535,120,110,125,585,290],enchanter:[740,240,120,105,800,390],armorer:[100,425,130,110,260,500],alchemist:[615,545,115,100,660,705],artificer:[200,690,130,90,360,735],quartermaster:[440,730,120,100,590,695],market:[330,390,110,80,415,530]};
 for(const h of D.HOUSES){const [x,y,w,hgt,nx,ny]=layout[h.owner];Object.assign(h,{x,y,w,h:hgt});Object.assign(D.TRADERS[h.owner],{x:nx,y:ny});}
 const props=[['well',450,380,38,38],['cart',260,580,65,36],['forge',165,292,42,32],['barrels',100,310,30,35],['crates',740,690,45,35],['bench',725,445,60,18],['woodpile',145,645,60,24],['lantern',895,406,12,12],['lantern',895,582,12,12]];
 for(const [betaKind,x,y,w,h]of props)D.OBSTACLES.push({x,y,w,h,type:'rock',betaKind});

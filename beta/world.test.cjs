@@ -68,7 +68,7 @@ test('canonical full UI boots and renders all clusters with software 3D without 
  }
  const probe=world.monsters.find(m=>!betaR.clusterOf(m).startsWith('dungeon:')),home={x:probe.x,y:probe.y};const deposit=world.nodes.find(n=>betaR.clusterOf(n)===betaR.clusterOf(probe)&&L.free({x:n.x-85,y:n.y},30));assert(deposit);probe.x=deposit.x-85;probe.y=deposit.y;for(let i=0;i<80;i++){const dx=deposit.x-probe.x,dy=deposit.y-probe.y,len=Math.hypot(dx,dy)||1;world.moveEntity(probe,dx/len*5,dy/len*5,1);assert(Math.hypot(probe.x-deposit.x,probe.y-deposit.y)>betaR.TYPES[probe.type].radius+31,'mob never enters resource');}Object.assign(probe,home);
  for(const h of betaR.HOUSES)assert(betaR.blocked(h.x+h.w/2,h.y+h.h/2),'house collider '+h.owner);
- for(const n of Object.values(betaR.TRADERS)){assert(!betaR.blocked(n.x,n.y,18),'NPC access '+n.name);const path=betaR.findPath(betaR.SPAWN.x,betaR.SPAWN.y,n.x,n.y);assert(path.length&&Math.hypot(path.at(-1).x-n.x,path.at(-1).y-n.y)<65,'route to '+n.name);}
+ for(const n of Object.values(betaR.TRADERS)){assert(betaR.PORTALS.every(p=>Math.hypot(p.x-n.x,p.y-n.y)>=195),'merchant interaction stays outside crossing range '+n.name);assert(!betaR.blocked(n.x,n.y,18),'NPC access '+n.name);const path=betaR.findPath(betaR.SPAWN.x,betaR.SPAWN.y,n.x,n.y);assert(path.length&&Math.hypot(path.at(-1).x-n.x,path.at(-1).y-n.y)<65,'route to '+n.name);}
  for(const n of world.nodes.filter(n=>betaR.inVillage(n.x,n.y)))assert(!betaR.blocked(n.x,n.y,15),'resource access '+n.id);
  scene.render(world);const cached=scene.cachedFaces;scene.render(world);assert.equal(scene.cachedFaces,cached,'software geometry cache reused');world.nodes[0].charges--;scene.render(world);assert.notEqual(scene.cachedFaces,cached,'resource change invalidates software cache');const rawDraw=scene.draw.bind(scene);scene.draw=(kind,x,y,z,sx,sy,sz,...args)=>{assert([x,y,z,sx,sy,sz].every(Number.isFinite),'finite '+kind);return rawDraw(kind,x,y,z,sx,sy,sz,...args);};
  const modelSignatures=new Set();let geometry=[];const validatedDraw=scene.draw;scene.draw=(...args)=>{geometry.push(args);return validatedDraw(...args);};for(const type of Object.keys(betaR.TYPES)){geometry=[];scene.faces=[];scene.creature({type,x:500,y:500,facing:{x:0,y:1},walking:true,footstep:1,alive:true},1);assert(scene.faces.length>0,type);modelSignatures.add(JSON.stringify(geometry));}assert.equal(modelSignatures.size,Object.keys(betaR.TYPES).length,'distinct rendered mob models');
@@ -173,7 +173,31 @@ test('beta uses Ukrainian even with an old foreign locale, without changing stab
 
 test('a swing keeps its aim during movement and pointer changes',()=>{const w=new World();w.monsters=[];w.aimTarget={x:w.state.x,y:w.state.y-100};w.attack();const facing={...w.facing};w.aimTarget={x:w.state.x+100,y:w.state.y};w.update(.05,{x:1});assert.deepEqual(w.facing,facing);for(let i=0;i<8;i++)w.update(.05,{x:1});assert(w.facing.x>0);});
 
-test('beta minimap draws markers without text while the atlas keeps region names',()=>{let labels=[];const noop=()=>{},ctx=new Proxy({fillText:(text)=>labels.push(text)},{get:(o,k)=>k in o?o[k]:noop}),env={window:{BrukRealms:R}};vm.runInNewContext(fs.readFileSync(path.join(__dirname,'atlas.js'),'utf8'),env);const w=new World();env.window.HoMoWAtlas.mini(ctx,{width:175,height:120},w,{});assert.equal(labels.length,0);env.window.HoMoWAtlas.full(ctx,{width:1000,height:688},w);assert(labels.length>0);});
+test('beta minimap draws markers without text while the atlas keeps region names',()=>{let labels=[];const noop=()=>{},gradient={addColorStop:noop},ctx=new Proxy({fillText:(text)=>labels.push(text),createRadialGradient:()=>gradient},{get:(o,k)=>k in o?o[k]:noop}),env={window:{BrukRealms:R}};vm.runInNewContext(fs.readFileSync(path.join(__dirname,'atlas.js'),'utf8'),env);const w=new World();env.window.HoMoWAtlas.mini(ctx,{width:175,height:120},w,{});assert.equal(labels.length,0);env.window.HoMoWAtlas.full(ctx,{width:1000,height:688},w);assert(labels.length>0);});
+test('shaded atlas caches terrain, draws landmarks and keeps every map coordinate finite',()=>{
+ let builds=0;
+ class Surface{constructor(width,height){this.width=width;this.height=height;}getContext(){return{createImageData(width,height){builds++;return{data:new Uint8ClampedArray(width*height*4)};},putImageData(){}};}}
+ const calls=[],gradient={addColorStop(...args){calls.push(['gradient',...args]);}},target={fillText(...args){calls.push(['fillText',...args]);},createRadialGradient(...args){calls.push(['createRadialGradient',...args]);return gradient;}};
+ const ctx=new Proxy(target,{get:(object,key)=>key in object?object[key]:(...args)=>calls.push([key,...args]),set:(object,key,value)=>{object[key]=value;calls.push(['set:'+key,value]);return true;}});
+ const road=[{x:500,y:470},{x:1500,y:700}],data={...R,OBSTACLES:[...R.OBSTACLES,{type:'tree',betaKind:'oak',x:800,y:800,w:40,h:40},{type:'water',x:1200,y:700,w:200,h:120}]},env={BrukRealms:data,HoMoWGeography:{landscape:{road:'b3a68a',roadEdge:'928870',water:'759b94',shore:'586d5b',shallow:'698780'},borders:[{x:2000,y:800,vertical:true,kind:'ridge'}],roads:new Map([['test',[road]]])},OffscreenCanvas:Surface};env.window=env;vm.createContext(env);vm.runInContext(fs.readFileSync(path.join(__dirname,'atlas.js'),'utf8'),env);
+ const w=new World();w.encounter={members:[{alive:true,x:900,y:700}],endsAt:120000};w.wallClock=()=>0;
+ const mini={width:175,height:120};env.HoMoWAtlas.mini(ctx,mini,w,{});assert.equal(builds,1);assert.equal(calls.filter(a=>a[0]==='fillText').length,0);assert(calls.some(a=>a[0]==='set:fillStyle'&&a[1]==='#759b94'));assert(calls.some(a=>a[0]==='set:fillStyle'&&a[1]==='#4d684d'));
+ env.HoMoWAtlas.mini(ctx,mini,w,{});assert.equal(builds,1,'stationary minimap reuses its terrain tile');w.state.x+=1800;env.HoMoWAtlas.mini(ctx,mini,w,{});assert.equal(builds,2,'crossing terrain tiles refreshes the cache');
+ const full={width:400,height:275};env.HoMoWAtlas.full(ctx,full,w,{resources:false,enemies:false});assert.equal(builds,3);env.HoMoWAtlas.full(ctx,full,w,{resources:false,enemies:false});assert.equal(builds,3,'full world map reuses its terrain tile');
+ const labels=calls.filter(a=>a[0]==='fillText').map(a=>a[1]);assert(labels.some(text=>String(text).includes('Мідні вершини')));assert(labels.some(text=>String(text)==='II'||String(text)==='VIII'));
+ const finite=value=>typeof value!=='number'||Number.isFinite(value);assert(calls.every(call=>call.slice(1).every(value=>Array.isArray(value)?value.every(finite):finite(value))),'canvas never receives NaN or infinity');
+});
+
+test('atlas banners avoid dense markers without moving resources or covering their own title badges',()=>{
+ const banners=[],markers=[],labels=[],noop=()=>{},target={createRadialGradient:()=>({addColorStop:noop}),roundRect(x,y,width,height){if(['#e4d6af','#c4c4a7'].includes(this.fillStyle))banners.push({left:x,top:y,right:x+width,bottom:y+height});},rect(x,y,width,height){if(this.fillStyle==='#ff00ff')markers.push({left:x,top:y,right:x+width,bottom:y+height});},fillText(text,x,y,width){labels.push({text,x,y,width});}},ctx=new Proxy(target,{get:(object,key)=>key in object?object[key]:noop});
+ const type=Object.keys(R.NODE_TYPES)[0],resource=R.NODE_TYPES[type].resource,data={...R,RESOURCES:{...R.RESOURCES,[resource]:{...R.RESOURCES[resource],color:'#ff00ff'}}},env={BrukRealms:data};env.window=env;vm.runInNewContext(fs.readFileSync(path.join(__dirname,'atlas.js'),'utf8'),env);
+ const w=new World(),cluster=R.CLUSTERS.find(c=>!c.safe);w.nodes=Array.from({length:8},(_,i)=>({x:cluster.x+cluster.w*.5+(i%4-1.5)*130,y:cluster.y+cluster.h*.56+(Math.floor(i/4)-.5)*120,type,charges:1}));w.monsters=[];
+ const canvas={width:1000,height:688};env.HoMoWAtlas.full(ctx,canvas,w,{resources:true,enemies:true});assert.equal(markers.length,w.nodes.length);
+ const title=labels.find(label=>label.text===cluster.name),banner=banners.find(box=>title.x>=box.left&&title.x<box.right&&title.y>=box.top&&title.y<box.bottom);assert(banner);assert.equal(title.x,banner.left+40);assert(title.x+title.width<banner.right,'title has a separate lane from the biome and Roman tier badges');
+ for(const [i,marker] of markers.entries()){assert.equal(marker.left,w.nodes[i].x/R.WIDTH*canvas.width-2.5);assert.equal(marker.top,w.nodes[i].y/R.HEIGHT*canvas.height-2.5);assert(marker.right<=banner.left||marker.left>=banner.right||marker.bottom<=banner.top||marker.top>=banner.bottom,'banner finds space away from the crowded original center');}
+ markers.length=0;env.HoMoWAtlas.full(ctx,canvas,w,{resources:false,enemies:false});assert.equal(markers.length,0,'disabled resource layer contributes no dots');
+});
+
 test('Space no longer attacks and the attack HUD control is hidden',()=>{const js=fs.readFileSync(path.join(__dirname,'client.js'),'utf8'),css=fs.readFileSync(path.join(__dirname,'world.css'),'utf8');assert(js.includes('attack:false'));assert(!js.includes("attack:keys.has('Space')"));assert(!js.includes("'Space',"));assert(css.includes('#attackAction{display:none!important}'));});
 
 test('all canonical enemy and resource types have explicit, distinct visual identities',()=>{const S=require('./world-style.js');for(const id of Object.keys(R.TYPES))assert(S.mob(id).family);for(const id of Object.keys(R.NODE_TYPES))assert(S.resource(id).family);const ores=Object.keys(R.NODE_TYPES).filter(id=>id.startsWith('ore_t'));assert.equal(new Set(ores.map(id=>S.resource(id).color)).size,8);});
@@ -185,13 +209,34 @@ test('articulated walking plants stance feet, lifts the swing and preserves moun
  const state=new World().state,calls=[],view={opt:{shadows:false},draw(...a){assert(a.slice(1,7).every(Number.isFinite),a[0]);calls.push(a);}};
  const draw=(phase,travel=0,mounted=false)=>{calls.length=0;env.HoMoWAvatar.draw(view,{state:{...state,x:0,y:travel,mounted},appearanceOnly:true,facing:{x:0,y:1},gait:1,walking:true,footstep:phase,time:1});return calls.slice();};
  const right=geometry=>geometry.find(a=>a[0].includes('/foot/')&&a[1]>0);
- const first=right(draw(Math.PI*.2)),next=right(draw(Math.PI*.3,Math.PI*.1/.16));
- assert(Math.abs(first[3]-next[3])<1e-8,'planted foot does not slide through the ground');
+ const perStep=R.moveSpeed(state)/13,first=right(draw(Math.PI*.2)),next=right(draw(Math.PI*.3,Math.PI*.1*perStep));
+ const body=Math.PI*.1*perStep;
+ assert(Math.abs(first[3]-next[3])<body*.55,'planted stride grips the ground');
  assert(Math.abs(first[2])<1e-8&&Math.abs(next[2])<1e-8,'body bounce does not lift the planted foot');
- assert(right(draw(Math.PI*1.7))[2]>3,'swing foot clears the ground');
- for(let i=0;i<64;i++)for(const a of draw(i*Math.PI/32).filter(a=>a[0].includes('/thigh/')))assert(Math.abs(a[5]-16*env.HoMoWScale.human)<1e-5,'constant upper-leg length');
+ assert(right(draw(Math.PI*1.05))[2]>3,'swing foot clears the ground');
+ for(let i=0;i<64;i++)for(const a of draw(i*Math.PI/32).filter(a=>a[0].includes('/thigh/')))assert(Math.abs(a[5]-13.9*env.HoMoWScale.human)<1e-5,'constant upper-leg length');
+ for(let i=0;i<64;i++)for(const a of draw(i*Math.PI/32).filter(a=>a[0].includes('/shin/')))assert(Math.abs(a[5]-13.6*env.HoMoWScale.human)<1e-5,'constant lower-leg length');
  const a=draw(0,0,true).filter(a=>a[0].includes('/foot/')),b=draw(2,0,true).filter(a=>a[0].includes('/foot/'));
  assert.deepEqual(a.map(p=>[p[1],p[3]]),b.map(p=>[p[1],p[3]]));
+});
+
+test('mounted riders follow saddle posting and mounts freeze when animations are disabled',()=>{
+ const env={BrukRealms:R,HoMoWArmory:{get:()=>({parts:[],colors:{}})}};env.window=env;vm.createContext(env);
+ for(const file of ['faceted-meshes','world-scale','mount-art','avatar'])vm.runInContext(fs.readFileSync(path.join(__dirname,file+'.js'),'utf8'),env);
+ const state=new World().state,calls=[],view={opt:{animations:true,shadows:false},heroLift:0,lifting:false,draw(...args){assert(args.slice(1,7).every(Number.isFinite),args[0]);if(this.lifting)args[2]+=this.heroLift;calls.push(args);}};
+ const render=(mount,phase,time,animated=true)=>{
+   calls.length=0;view.opt.animations=animated;view.lifting=false;view.heroLift=0;
+   const w={state:{...state,x:100,y:200,mounted:true,selectedMount:mount},facing:{x:0,y:1},gait:1,walking:true,footstep:phase,time};
+   const lift=env.HoMoWMountArt.mountModel.call(view,w),saddle=calls.find(a=>a[7]==='765239'),mountCalls=calls.slice();
+   calls.length=0;view.heroLift=lift;view.lifting=true;env.HoMoWAvatar.draw(view,{...w,appearanceOnly:true});
+   const rider=calls.find(a=>a[0].includes('/torso/'));
+   view.lifting=false;return {lift,saddleY:saddle[2],riderY:rider[2],mountCalls};
+ };
+ for(const mount of Object.keys(R.MOUNTS)){
+   const a=render(mount,.4,1),b=render(mount,1.3,1);
+   assert(Math.abs((a.riderY-a.saddleY)-(b.riderY-b.saddleY))<1e-8,mount+' rider has no double-counted out-of-phase bob');
+   const still=render(mount,.4,99,false),later=render(mount,2.7,199,false);assert.deepEqual(later.mountCalls,still.mountCalls,mount+' disabled gait is identical');
+ }
 });
 
 test('body picking uses cached custom facets with yaw, pitch and lean and rejects hidden targets',()=>{
@@ -363,14 +408,41 @@ test('overlapping armor facets resolve per pixel in either draw order',()=>{
  view.faces.reverse();env.HoMoWRaster.flush(view,true);assert.deepEqual(pixel(1,1),[210,185,80,255]);assert.deepEqual(pixel(5,1),[240,20,15,255]);
 });
 
-test('wide obstacle cutaway reveals surroundings without removing geometry behind the hero',()=>{
+test('obstacle reveal follows the actual hero silhouette and preserves nearby and rear geometry',()=>{
  const env={HoMoWMaterials:{}};env.window=env;vm.createContext(env);vm.runInContext(fs.readFileSync(path.join(__dirname,'raster.js'),'utf8'),env);
  const ctx={createImageData:(w,h)=>({data:new Uint8ClampedArray(w*h*4)}),putImageData(image){this.output=image.data;}},size=256;
- const face=(rgb,depth,cutaway)=>({rgb,cutaway,pts:[[0,0],[size,0],[size,size],[0,size]].map(([x,y])=>({x,y,depth}))});
- const cut={screenX:128,screenY:128,rx:34*2.4,ry:43*2.4,depth:0},view={ctx,canvas:{width:size,height:size},width:size,height:size,faces:[face([20,90,30],0),face([160,110,70],10,cut)]};
- const pixel=(x,y)=>Array.from(ctx.output.slice((y*size+x)*4,(y*size+x)*4+4));
- env.HoMoWRaster.flush(view,true);assert.deepEqual(pixel(188,128),[20,90,30,255]);assert.deepEqual(pixel(230,128),[160,110,70,255]);
- view.faces[1].pts.forEach(p=>p.depth=4);env.HoMoWRaster.flush(view,true);assert.deepEqual(pixel(128,128),[160,110,70,255]);
+ const rectangle=(left,top,right,bottom,depth,rgb=[200,200,200])=>({rgb,pts:[[left,top],[right,top],[right,bottom],[left,bottom]].map(([x,y])=>({x,y,depth}))});
+ const hero=[rectangle(122,85,136,132,0),rectangle(110,100,116,125,0),rectangle(118,132,123,165,0),rectangle(134,132,139,165,0)],background=rectangle(0,0,size,size,-20,[20,90,30]),obstacle={...rectangle(0,0,size,size,10,[160,110,70]),covered:true},view={ctx,canvas:{width:size,height:size},width:size,height:size,faces:[background,obstacle]};
+ view.heroMask=env.HoMoWRaster.heroMask(view,hero,0);assert(view.heroMask.width<40&&view.heroMask.height<90,'only the projected body area allocates a mask');
+ const pixel=(x,y)=>Array.from(ctx.output.slice((y*size+x)*4,(y*size+x)*4+4));env.HoMoWRaster.flush(view,true);
+ assert.deepEqual(pixel(128,110),[20,90,30,255],'an occluder in front of the torso is removed');assert.deepEqual(pixel(112,110),[20,90,30,255],'the actual arm also stays visible');assert.deepEqual(pixel(188,128),[160,110,70,255],'nearby objects inside the old radius stay whole');assert.deepEqual(pixel(128,155),[160,110,70,255],'empty space between the legs is not a reveal radius');
+ for(const p of obstacle.pts)p.depth=-5;env.HoMoWRaster.flush(view,true);assert.deepEqual(pixel(128,110),[160,110,70,255],'geometry behind the body is untouched');
+ for(const p of obstacle.pts)p.depth=10;view.cachedFaces=view.faces;env.HoMoWRaster.flush(view,false);assert.deepEqual(pixel(128,110),[20,90,30,255]);
+ const shifted=hero.map(face=>({...face,pts:face.pts.map(p=>({...p,x:p.x-60}))}));view.heroMask=env.HoMoWRaster.heroMask(view,shifted,0);env.HoMoWRaster.flush(view,false);assert.deepEqual(pixel(128,110),[160,110,70,255],'a cached obstacle reappears when the hero moves');assert.deepEqual(pixel(68,110),[20,90,30,255],'the mask moves without rebuilding cached scenery');
+ const mask=view.heroMask;for(let i=0;i<mask.depth.length;i++){if(mask.data[i*4+3]===0)continue;const decoded=(mask.data[i*4]*256+mask.data[i*4+1])/65535*512-256;assert(Math.abs(decoded-mask.depth[i])<.01,'GPU depth encoding matches the CPU silhouette');}
+ view.heroMask=null;env.HoMoWRaster.flush(view,false);assert.deepEqual(pixel(68,110),[160,110,70,255]);
+});
+
+test('WebGL reveal uploads the same cropped silhouette and excludes the hero ground shadow',()=>{
+ const calls=[],gl=new Proxy({createTexture:()=>({}),createBuffer:()=>({})},{get:(object,key)=>key in object?object[key]:(...args)=>calls.push([key,...args])}),env={HoMoWMaterials:{units:8},HoMoWCamera3D:require('./camera3d.js')};env.window=env;vm.createContext(env);for(const name of ['faceted-meshes','raster','scene3d'])vm.runInContext(fs.readFileSync(path.join(__dirname,name+'.js'),'utf8'),env);
+ const scene=Object.create(env.HoMoWBeta3D.Scene.prototype);Object.assign(scene,env.HoMoWCamera3D.create(256,256,0,0,0,1),{camera:env.HoMoWCamera3D.create(256,256,0,0,0,1),cpu:false,gl,attributes:[0,1],canvas:{width:256,height:256},meshes:{cube:{data:env.HoMoWBeta3D.meshData('cube'),buffer:{},count:36},orb:{data:env.HoMoWBeta3D.meshData('orb'),buffer:{},count:60}},colorCache:new Map(),u:{rotation:'rotation',covered:'covered',heroRect:'heroRect',focus:'focus'},opt:{}});
+ scene.hero=function(){this.draw('cube',0,30,0,20,40,15,'ffcc99');this.draw('orb',0,.2,0,150,1,100,'5a614e');};scene.prepareHero({state:{x:0,y:0}});
+ assert(scene.heroMask&&scene.heroMask.width<20,'a wide ground shadow does not enlarge the silhouette');assert.equal(calls.filter(call=>call[0]==='drawArrays').length,0,'the silhouette pass never draws into the visible GPU framebuffer');
+ const upload=calls.find(call=>call[0]==='texImage2D');assert.equal(upload[4],scene.heroMask.width);assert.equal(upload[5],scene.heroMask.height);assert.equal(upload[9],scene.heroMask.data);assert(calls.some(call=>call[0]==='uniform4f'&&call[1]==='heroRect'&&call[3]===256-scene.heroMask.top));
+ scene.cover=true;scene.draw('cube',0,30,30,50,50,10,'887766');assert.equal(calls.filter(call=>call[0]==='drawArrays').length,1);assert(calls.some(call=>call[0]==='uniformMatrix3fv'),'the real draw restores its GPU rotation after the mask pass');assert(calls.some(call=>call[0]==='uniform1i'&&call[1]==='covered'&&call[2]===1));
+ const source=fs.readFileSync(path.join(__dirname,'scene3d.js'),'utf8');assert(source.includes('hero.a>.5&&sightDepth>depth+.75'));assert(!source.includes('dot(sight.xy,sight.xy)'));
+});
+
+test('WebGL reveal includes back-facing planar hero meshes while CPU culling is retained',()=>{
+ const calls=[],gl=new Proxy({createTexture:()=>({})},{get:(object,key)=>key in object?object[key]:(...args)=>calls.push([key,...args])}),env={HoMoWMaterials:{units:8},HoMoWCamera3D:require('./camera3d.js')};env.window=env;vm.createContext(env);for(const name of ['faceted-meshes','raster','scene3d'])vm.runInContext(fs.readFileSync(path.join(__dirname,name+'.js'),'utf8'),env);
+ const data=new Float32Array([[-.5,-.5,0],[-.5,.5,0],[.5,.5,0],[-.5,-.5,0],[.5,.5,0],[.5,-.5,0]].flatMap(p=>[...p,0,0,-1])),camera=env.HoMoWCamera3D.create(256,256,0,0,0,1),scene=Object.create(env.HoMoWBeta3D.Scene.prototype);
+ Object.assign(scene,camera,{camera,cpu:false,gl,attributes:[0,1],canvas:{width:256,height:256},meshes:{shield:{data,buffer:{},count:6}},colorCache:new Map(),u:{rotation:'rotation',covered:'covered',heroRect:'heroRect',focus:'focus'},opt:{},faces:[]});
+ const w={state:{x:0,y:0}};scene.hero=function(){this.draw('shield',0,30,0,20,40,1,'ffcc99');};scene.prepareHero(w);
+ assert(scene.heroMask,'the visible back-facing shield must contribute to the GPU mask');assert(scene.heroMask.data.some((value,index)=>index%4===3&&value===255),'the planar shield produces opaque silhouette pixels');
+ assert.equal(calls.find(call=>call[0]==='texImage2D')[9],scene.heroMask.data);assert.equal(calls.filter(call=>call[0]==='drawArrays').length,0,'the mask pass never draws into the visible GPU framebuffer');
+ scene.hero(w);assert.equal(calls.filter(call=>call[0]==='drawArrays').length,1,'the visible GPU renderer draws the same back-facing shield');
+ scene.cpu=true;scene.faces=[];scene.hero(w);assert.equal(scene.faces.length,0,'the CPU visible pass still culls the back-facing shield');scene.prepareHero(w);assert.equal(scene.heroMask,null,'the CPU mask pass retains the same back-face culling');
+ scene.hero=function(){this.draw('shield',0,30,0,20,40,1,'ffcc99',Math.PI);};scene.hero(w);assert.equal(scene.faces.length,2,'the CPU visible pass still draws a front-facing planar shield');scene.prepareHero(w);assert(scene.heroMask,'the CPU mask includes the front-facing shield');
 });
 
 test('tree models retain their species, scale, and a matching harvested stump',()=>{
@@ -387,6 +459,10 @@ test('tree models retain their species, scale, and a matching harvested stump',(
  const trees=Array.from({length:6},(_,i)=>bounds(i,true));
  assert(trees.every(b=>b.top>5*32&&b.top<22*32));assert(trees[1].width/trees[1].top>trees[2].width/trees[2].top*1.3);
  for(let i=0;i<trees.length;i++)assert(bounds(i,false).top<trees[i].top*.04);
+ const calls=[],view={opt:{animations:false},draw(...args){calls.push(args);}};
+ const capture=(shape,time)=>{calls.length=0;env.HoMoWTrees.draw.call(view,0,0,2,shape,true,'forest',619,time);return calls.slice();};
+ for(let shape=0;shape<6;shape++){const still=capture(shape,1);assert.deepEqual(capture(shape,80),still,'disabled wind leaves no static phase tilt');assert(still.every(a=>a[10]===0&&a[11]===0));}
+ view.opt.animations=true;assert.notDeepEqual(capture(1,1),capture(1,80),'enabled wind changes the canopy');
 });
 
 test('hero experience migrates once, carries levels and releases the level-100 reserve once',()=>{
@@ -466,12 +542,17 @@ test('architecture and geology textures are deterministic, opaque and distinct',
  assert.equal(signatures.size,9);
 });
 
-test('desktop inventory and shops filter without changing slots and trade exact quantities',async()=>{
+async function betaPanelHarness(){
  const {parseHTML}=await import('linkedom'),{window}=parseHTML(fs.readFileSync(path.join(__dirname,'index.html'),'utf8')),document=window.document;
  Object.defineProperty(window.HTMLSelectElement.prototype,'value',{configurable:true,get(){return this.querySelector('option[selected]')?.getAttribute('value')||'';},set(value){for(const o of this.querySelectorAll('option'))o.toggleAttribute('selected',o.getAttribute('value')===String(value));}});
  window.HTMLElement.prototype.showModal=function(){this.setAttribute('open','');};window.HTMLElement.prototype.close=function(){this.removeAttribute('open');};Object.defineProperty(window.HTMLElement.prototype,'open',{configurable:true,get(){return this.hasAttribute('open');}});
  const env={document,BrukRealms:require('./core.js'),BrukRealmsArt:{icon:()=>'<svg></svg>'},HoMoWPortrait(){},setTimeout:fn=>{fn();return 1;},clearTimeout(){}};env.window=env;vm.createContext(env);
- for(const file of ['inventory','panels','market'])vm.runInContext(fs.readFileSync(path.join(__dirname,file+'.js'),'utf8'),env);
+ for(const file of ['inventory','panels','market','community'])vm.runInContext(fs.readFileSync(path.join(__dirname,file+'.js'),'utf8'),env);
+ return {env,window,document};
+}
+
+test('desktop inventory and shops filter without changing slots and trade exact quantities',async()=>{
+ const {env,document}=await betaPanelHarness();
  const w=new World();w.state.resources.copper=12;w.state.resources.iron=5;
  const root=document.getElementById('inventoryItems'),ui=env.BrukInventory.mount(root,w,{result:fn=>{const result=fn();if(result.ok)ui.render();return result;},notice(){}});ui.render();
  const original=JSON.stringify(w.state),slots=env.BrukRealms.inventoryLayout(w.state).slice(),visible=()=>[...root.querySelectorAll('.pack-grid .pack-cell')].filter(n=>!n.hidden);
@@ -489,13 +570,46 @@ test('desktop inventory and shops filter without changing slots and trade exact 
  stock.querySelector('input[type=checkbox]').checked=true;stock.querySelector('input[type=checkbox]').onchange();assert.equal(cards().length,0);assert.equal(JSON.stringify(w.state),beforeShop);
  w.state.silver=200;panels.refresh();assert(cards().length>0);assert(cards().every(c=>c.querySelector('[data-tool]:not(:disabled)')));document.getElementById('merchantDialog').close();
  Object.assign(w.state,env.BrukRealms.TRADERS.market);w.state.silver=500;w.state.resources.copper=20;w.state.bank.copper=50;
- const exchange=document.createElement('div'),marketApi={refresh(){exchange.replaceChildren();env.HoMoWMarket.render(exchange,w,marketApi);},result(fn){const result=fn();if(result.ok)marketApi.refresh();return result;}};marketApi.refresh();
+ const exchange=document.createElement('div'),marketApi={refresh(){exchange.replaceChildren();env.HoMoWMarket.render(exchange,w,marketApi);},result(fn){const result=fn();if(result.ok)marketApi.refresh();return result;}};marketApi.refresh();assert.equal(exchange.querySelector('.exchange-controls'),null);exchange.querySelector('[data-market-item="copper"]').click();
  const preset=n=>[...exchange.querySelectorAll('.exchange-presets button')].find(b=>b.textContent===n).click();preset('5');const price=w.quote('copper');exchange.querySelector('[data-sell="copper:bag"]').click();assert.equal(w.state.resources.copper,15);assert.equal(w.state.silver,500+5*price);
  preset('MAX');assert.equal(Number(exchange.querySelector('input[type=number]').value),50);assert(exchange.querySelector('[data-sell="copper:bag"]').disabled);assert(!exchange.querySelector('[data-sell="copper:bank"]').disabled);
  for(const n of ['-1','0','1.5','1001']){const amount=exchange.querySelector('input[type=number]');amount.value=n;amount.oninput();assert([...exchange.querySelectorAll('.exchange-controls button')].every(b=>b.disabled));}
  [...exchange.querySelectorAll('.exchange-toolbar button')].find(b=>b.textContent==='Купити').click();preset('5');const buyPrice=Math.ceil(w.quote('copper')*1.3),silver=w.state.silver;exchange.querySelector('.exchange-controls button').click();assert.equal(w.state.bank.copper,55);assert.equal(w.state.resources.copper,15);assert.equal(w.state.silver,silver-5*buyPrice);
  preset('MAX');assert.equal(Number(exchange.querySelector('input[type=number]').value),Math.min(1000,Math.floor(w.state.silver/buyPrice)));
  const search=exchange.querySelector('input[type=search]');search.value='немає такого ресурсу';search.oninput();assert.equal(exchange.querySelector('.exchange-controls'),null);
+});
+
+test('merchant types expand into variants and tier previews without changing sequential trade',async()=>{
+ const {env,window,document}=await betaPanelHarness(),B=env.BrukRealms,w=new World({silver:10000}),panels=env.BrukRealmsPanels.create(w,{save(){},notice(){},hud(){},clearKeys(){},focus(){}}),stock=document.getElementById('merchantStock');
+ Object.assign(w.state,B.TRADERS.blacksmith);panels.town('blacksmith');
+ const key='blacksmith:shop:variant:sword',group=()=>stock.querySelector('[data-stock-group="'+key+'"]');
+ assert.equal(stock.querySelectorAll('[data-stock-category=variant]').length,5);assert([...stock.querySelectorAll('.stock-group')].every(n=>!n.open));assert.equal(group().querySelector('.stock-summary strong').textContent,'Меч');assert.equal(group().querySelectorAll('.gear-card').length,1);
+ group().querySelector('summary').click();group().setAttribute('open','');
+ const before=JSON.stringify(w.state),choose=(selector,value)=>{const select=stock.querySelector(selector);select.value=value;select.onchange();};
+ choose('[data-stock-variant="'+key+'"]','sword_claymore');assert(group().open);assert.equal(group().querySelector('h3').textContent,B.VARIANTS.sword_claymore.name);
+ choose('[data-stock-tier="variant:sword_claymore"]','3');assert(group().open);assert(group().textContent.includes('Характеристики · T3'));assert(group().querySelector('[data-buy-gear]').disabled);assert.equal(JSON.stringify(w.state),before);
+ choose('[data-stock-tier="variant:sword_claymore"]','0');const offer=B.gearOffer(w.state,'variant','sword_claymore'),silver=w.state.silver;group().querySelector('[data-buy-gear]').click();assert.equal(w.state.variantArsenal.sword_claymore,0);assert.equal(w.state.silver,silver-offer.cost);assert(group().open);assert.equal(group().querySelector('[data-stock-tier]').value,'1');
+ stock.querySelector('[data-category=craft]').click();choose('[data-stock-variant="blacksmith:craft:variant:sword"]','sword_claymore');
+ const craft=B.gearOffer(w.state,'variant','sword_claymore');for(const [id,n]of Object.entries(craft.input))w.state.bank[id]=n;panels.refresh();const craftSilver=w.state.silver;stock.querySelector('[data-forge-gear="variant:sword_claymore"]').click();assert.equal(w.state.variantArsenal.sword_claymore,1);assert.equal(w.state.silver,craftSilver-craft.fee);for(const id of Object.keys(craft.input))assert.equal(w.state.bank[id],0);
+ document.getElementById('merchantDialog').close();Object.assign(w.state,B.TRADERS.enchanter);w.state.bank.crystal=50;w.state.bank.mithril_ingot=50;panels.town('enchanter');
+ const enchantChoice=stock.querySelector('[data-stock-variant="enchanter:craft:variant:sword"]');enchantChoice.value='sword_claymore';enchantChoice.onchange();const enchant=B.enchantOffer(w.state,'variant','sword_claymore'),enchantSilver=w.state.silver;stock.querySelector('[data-enchant="variant:sword_claymore"]').click();assert.equal(B.enchantLevel(w.state,'variant','sword_claymore'),1);assert.equal(w.state.silver,enchantSilver-enchant.cost);
+});
+
+test('all merchant catalogs group potion and resource tiers while keeping exact item IDs',async()=>{
+ const {env,document}=await betaPanelHarness(),B=env.BrukRealms,w=new World({silver:10000}),panels=env.BrukRealmsPanels.create(w,{save(){},notice(){},hud(){},clearKeys(){},focus(){}}),stock=document.getElementById('merchantStock');
+ for(const id of ['mage','armorer','artificer','quartermaster']){Object.assign(w.state,B.TRADERS[id]);panels.town(id);assert(stock.querySelector('.stock-group'),id);assert([...stock.querySelectorAll('.stock-group')].every(n=>!n.open),id);document.getElementById('merchantDialog').close();}
+ Object.assign(w.state,B.TRADERS.alchemist);panels.town('alchemist');assert.equal(stock.querySelectorAll('[data-stock-category=potions]').length,8);assert.equal(stock.querySelectorAll('.potion-card').length,8);
+ const potion=stock.querySelector('[data-stock-variant="alchemist:potions:health"]'),before=JSON.stringify(w.state);potion.value='health_3';potion.onchange();assert.equal(JSON.stringify(w.state),before);const card=stock.querySelector('[data-stock-group="alchemist:potions:health"] .potion-card');assert(card.textContent.includes('Відновлення: +'+B.POTIONS.health_3.power));const silver=w.state.silver;card.querySelector('button').click();assert.equal(w.state.consumables.health_3,1);assert.equal(w.state.silver,silver-B.POTIONS.health_3.price);
+ document.getElementById('merchantDialog').close();Object.assign(w.state,B.TRADERS.market);panels.town('market');assert.equal(stock.querySelectorAll('[data-market-group=ore]').length,1);assert.equal(stock.querySelector('.exchange-controls'),null);
+ stock.querySelector('[data-market-group=ore]').click();const tiers=stock.querySelector('[aria-label="Тир ресурсу"]');assert.equal(tiers.querySelectorAll('option').length,8);tiers.value='ore_t4';tiers.onchange();assert(stock.querySelector('.exchange-detail').textContent.includes(B.RESOURCES.ore_t4.name));
+ [...stock.querySelectorAll('.exchange-toolbar button')].find(b=>b.textContent==='Купити').click();const resourceSilver=w.state.silver,cost=Math.ceil(w.quote('ore_t4')*1.3);stock.querySelector('.exchange-controls button').click();assert.equal(w.state.bank.ore_t4,1);assert.equal(w.state.silver,resourceSilver-cost);
+ const search=stock.querySelector('[aria-label="Пошук на ринку"]');search.value='немає такого';search.oninput();assert.equal(stock.querySelector('.exchange-controls'),null);
+});
+
+test('billboard formats session seconds as Ukrainian days hours and minutes only',async()=>{
+ const {env,document}=await betaPanelHarness(),w=new World(),cases=[[0,'менше хвилини'],[59,'менше хвилини'],[60,'1 хвилина'],[120,'2 хвилини'],[300,'5 хвилин'],[1260,'21 хвилина'],[3600,'1 година'],[3660,'1 година 1 хвилина'],[86400,'1 день'],[172800,'2 дні'],[586439,'6 днів 18 годин 53 хвилини'],[31536000,'365 днів']],boards={session:cases.map(([value],i)=>({name:'Player '+i,value})),money:[{name:'Rich',value:123456}]},network={leaderboard:async()=>({boards}),command(){}};
+ const ui=env.HoMoWCommunity.mount(w,network,{clearKeys(){},focus(){},notice(){}});Object.assign(w.state,env.BrukRealms.BILLBOARD);ui.openBoard();await new Promise(resolve=>setImmediate(resolve));document.querySelector('[data-ranking=session]').click();
+ assert.equal(document.querySelector('[data-ranking=session]').textContent,'Нон-стоп · час');assert.deepEqual([...document.querySelectorAll('.ranking-row>b')].map(n=>n.textContent),cases.map(([,text])=>text));document.querySelector('[data-ranking=money]').click();assert.equal(document.querySelector('.ranking-row>b').textContent,(123456).toLocaleString('uk-UA'));
 });
 
 test('inventory detail stays in normal flow below nonshrinking equipment and bag columns',()=>{
@@ -575,7 +689,7 @@ test('civilian traders have cached sculpted faces, limbs and eight distinct prof
  for(const id of ['blacksmith','mage','enchanter','armorer','alchemist','artificer','quartermaster','market']){
    const n=Object.freeze({...R.TRADERS[id],x:510,y:620}),before=JSON.stringify(n),active=capture(()=>trader.call(scene,n,id,1));
    assert.equal(JSON.stringify(n),before);assert(active.length<60);assert(active.every(a=>a[0].startsWith('civilian/'+id+'/')&&a[1]===n.x&&a[3]===n.y));
-   for(const slot of ['cloth','trousers','boots','skin','skinShade','eyes','eyeWhite','hair','mouth','trim'])assert(active.some(a=>a[0].endsWith('/'+slot)),id+' '+slot);
+   for(const slot of ['cloth','trousersL','trousersR','bootsL','bootsR','skin','skinShade','eyes','eyeWhite','hair','mouth','trim'])assert(active.some(a=>a[0].endsWith('/'+slot)),id+' '+slot);
    assert(active.every(a=>a.slice(4,7).every(s=>s===env.HoMoWScale.human)));assert(active.every(a=>a[10]===0&&a[11]===0));
    if(['blacksmith','armorer','artificer'].includes(id))assert(active.some(a=>a[0].endsWith('/apron')));
    assert(active.some(a=>a[9]==='leather'));shapes.add(signature(active));
@@ -589,14 +703,24 @@ test('civilian traders have cached sculpted faces, limbs and eight distinct prof
  const a=capture(()=>trader.call(scene,n,'artificer',3)),b=second.capture(()=>second.env.HoMoWFull.Scene.prototype.trader.call(second.scene,n,'artificer',3));assert.deepEqual(a,b);assert.equal(signature(a),second.signature(b));
 });
 
-test('civilian trader idle, shadow and low-texture options do not change identity or cache size',()=>{
+test('civilian trader idle, shadow, steps and low-texture options preserve identity and cache size',()=>{
  const {env,scene,capture}=cottonCivilianHarness(),trader=env.HoMoWFull.Scene.prototype.trader,n=Object.freeze({id:'true-market',x:123,y:456,name:'seller',role:'market'}),before=JSON.stringify(n);
  const still=capture(()=>trader.call(scene,n,'market',1));assert.equal(still.filter(a=>a[0]==='sphere').length,1);
  const size=env.HoMoWForms.meshes.size;scene.opt.shadows=false;const unshadowed=capture(()=>trader.call(scene,n,'market',22));assert.deepEqual(unshadowed,still.filter(a=>a[0]!=='sphere'));
  scene.opt.animations=true;const moving=capture(()=>trader.call(scene,n,'market',3));assert(moving.some(a=>Math.abs(a[10])+Math.abs(a[11])>0));assert(moving.every(a=>a.slice(1,7).every(Number.isFinite)));assert.deepEqual(moving.map(a=>a[0]),unshadowed.map(a=>a[0]));assert.deepEqual(capture(()=>trader.call(scene,n,'market',3)),moving);
+ const motion={walking:true,gait:.34,footstep:.18,facing:{x:1,y:-.5}},stepping=capture(()=>trader.call(scene,n,'market',3,motion)),nextStep=capture(()=>trader.call(scene,n,'market',3,{...motion,footstep:.41}));
+ assert.notDeepEqual(stepping,nextStep);assert(stepping.some(a=>/\/boots[LR]$/.test(a[0])&&a[2]>0));assert(stepping.every(a=>a.slice(1,7).every(Number.isFinite)));assert.deepEqual(stepping.map(a=>a[0]),unshadowed.map(a=>a[0]));
  scene.opt.lowTextures=true;assert(capture(()=>trader.call(scene,n,'market',3)).every(a=>a[9]===null));
- scene.opt.animations=false;const market=capture(()=>trader.call(scene,n,'market',3)),fallback=capture(()=>trader.call(scene,n,'unknown-profession',100));assert.deepEqual(fallback,market);
+ scene.opt.animations=false;const market=capture(()=>trader.call(scene,n,'market',3)),fallback=capture(()=>trader.call(scene,n,'unknown-profession',100));assert.deepEqual(fallback,market);assert.deepEqual(capture(()=>trader.call(scene,n,'market',90,{...motion,footstep:2.7})),market,'disabled animations freeze walking traders');
  assert.equal(env.HoMoWForms.meshes.size,size);assert.equal(JSON.stringify(n),before);
+});
+
+test('drifting villagers face their travel and use subtle steps only while animated',()=>{
+ const {env,scene}=cottonCivilianHarness(),renders=[];env.HoMoWVillage={spread:p=>p};scene.visibleAt=()=>true;scene.trader=(...args)=>renders.push(args);scene.opt.animations=true;
+ const v=R.VILLAGE,w={state:{x:v.x+v.w/2,y:v.y+v.h/2},time:12};
+ scene.villageLife(w);assert(renders.length>0&&renders.length<=3);
+ for(const [,id,time,motion] of renders){assert(time===12);assert(motion.walking&&motion.gait===.34&&motion.footstep===10.8);assert(Math.hypot(motion.facing.x,motion.facing.y)>0);assert(['market','alchemist','quartermaster'].includes(id));}
+ scene.opt.animations=false;renders.length=0;scene.villageLife({...w,time:99});assert(renders.length>0&&renders.length<=3);assert(renders.every(a=>!a[3].walking&&a[2]===0));
 });
 
 function creatureAnatomyHarness(){

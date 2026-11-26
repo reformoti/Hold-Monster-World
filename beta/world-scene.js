@@ -8,7 +8,7 @@ class Scene extends window.HoMoWBeta3D.Scene{
  if(this.pickParts&&!(kind==='sphere'&&args[1]===1))this.pickParts.push([kind,x,y,z,args[0],args[1],args[2],args[4]||0,args[6]||0,args[7]||0]);
  return super.draw(kind,x,y+(this.heroLift||0),z,...args);}
  hero(w){const s=w.state;this.heroLift=0;if(s.mounted){this.heroLift=this.mountModel(w);}super.hero({...w,time:this.opt?.animations===false?0:w.time,walking:this.opt?.animations===false?false:w.walking,footstep:this.opt?.animations===false?0:w.footstep,gait:this.opt?.animations===false?0:w.gait,turnRate:this.opt?.animations===false?0:w.turnRate,twoHanded:s.weaponVariant?!R.offhandActive(s):false});const labelHeight=this.heroLift+68;this.heroLift=0;return labelHeight;}
- trader(n,id,time){
+ trader(n,id,time,motion={}){
   const F=window.HoMoWForms,palette={blacksmith:['665040','a58a63'],mage:['615a8e','b5a2cc'],enchanter:['3e7774','9bcfc2'],armorer:['5b6e7b','9cabb0'],alchemist:['526f49','b8c583'],artificer:['876e49','cfb887'],quartermaster:['525e66','c3b698'],market:['945e4b','dec185']};
   const profession=Object.hasOwn(palette,id)?id:'market',[cloth,trim]=palette[profession],human=window.HoMoWScale.human;
   const parts=F.model('civilian/'+profession,b=>{
@@ -17,9 +17,10 @@ class Scene extends window.HoMoWBeta3D.Scene{
     const robe=['mage','enchanter'].includes(profession);
     for(const side of [-1,1]){
       const x=side*7;
-      b.rings('trousers',[[8,4,4,x,0],[17,4.5,4.7,x,1],[21,5.2,5,x,-.7],[32,6.4,6,x,0]],7);
-      b.rings('boots',[[1,5.4,8,x,3],[4,6,9,x,4],[8,5.3,7,x,2],[12,4.2,4.7,x,0]],8);
-      b.rings('leather',[[10,4.5,5,x,0],[12,4.5,5,x,0]],7);
+      const leg=side<0?'L':'R';
+      b.rings('trousers'+leg,[[8,4,4,x,0],[17,4.5,4.7,x,1],[21,5.2,5,x,-.7],[32,6.4,6,x,0]],7);
+      b.rings('boots'+leg,[[1,5.4,8,x,3],[4,6,9,x,4],[8,5.3,7,x,2],[12,4.2,4.7,x,0]],8);
+      b.rings('leather'+leg,[[10,4.5,5,x,0],[12,4.5,5,x,0]],7);
     }
     if(robe){
       b.rings(['cloth','cloth','trim','cloth'],[[8,17,12],[13,16.7,11.5],[28,13,9.7],[34,11.3,9]],10);
@@ -110,11 +111,22 @@ class Scene extends window.HoMoWBeta3D.Scene{
       b.beam('trim',[-9,52,8],[8,34,11],1,1,5);
     }
   });
-  const colors={cloth,trim,trousers:'535346',boots:'463f35',leather:'785c40',apron:profession==='armorer'?'7c8a89':'9d7953',skin:'d5b28e',skinShade:'ba9273',eyeWhite:'e3d9bb',eyes:'293934',mouth:'8e6953',hair:profession==='enchanter'?'453d39':'6b513b',beard:'bcbcb0',wood:'735b40',metal:profession==='market'?'dcc67d':'aab3ac',pages:'d7cba3',gem:'8cdbcf',bottleGreen:'adc37c',bottleBlue:'9bb7d5'};
-  const materials={cloth:'leather',trim:'leather',trousers:'leather',boots:'leather',leather:'leather',apron:'leather',wood:'wood',metal:'steel',pages:'plaster',beard:'plaster',gem:'plaster',bottleGreen:'plaster',bottleBlue:'plaster'};
-  const phase=this.opt?.animations===false?0:Math.sin((time||0)*1.8+n.x),bob=phase*.22;
+  const colors={cloth,trim,trousersL:'535346',trousersR:'535346',bootsL:'463f35',bootsR:'463f35',leather:'785c40',leatherL:'785c40',leatherR:'785c40',apron:profession==='armorer'?'7c8a89':'9d7953',skin:'d5b28e',skinShade:'ba9273',eyeWhite:'e3d9bb',eyes:'293934',mouth:'8e6953',hair:profession==='enchanter'?'453d39':'6b513b',beard:'bcbcb0',wood:'735b40',metal:profession==='market'?'dcc67d':'aab3ac',pages:'d7cba3',gem:'8cdbcf',bottleGreen:'adc37c',bottleBlue:'9bb7d5'};
+  const materials={cloth:'leather',trim:'leather',trousersL:'leather',trousersR:'leather',bootsL:'leather',bootsR:'leather',leather:'leather',leatherL:'leather',leatherR:'leather',apron:'leather',wood:'wood',metal:'steel',pages:'plaster',beard:'plaster',gem:'plaster',bottleGreen:'plaster',bottleBlue:'plaster'};
+  const animated=this.opt?.animations!==false,walking=animated&&!!motion.walking,gait=walking?Math.max(0,Math.min(1,motion.gait??1)):0;
+  const stridePhase=(motion.footstep||0)*Math.PI*2,turn=animated&&motion.facing?Math.atan2(motion.facing.x,motion.facing.y):0;
+  const phase=animated?(walking?Math.sin(stridePhase):Math.sin((time||0)*1.8+n.x)):0,bob=walking?Math.abs(Math.sin(stridePhase*2))*.18*gait:phase*.22;
   if(this.opt?.shadows!==false)this.draw('sphere',n.x,1,n.y,23*human,1,15*human,'59614e',0,null,0,0);
-  for(const {mesh,slot} of parts)this.draw(mesh,n.x,bob*human,n.y,human,human,human,colors[slot],0,this.opt?.lowTextures?null:materials[slot]||null,phase*.002,phase*.003);
+  for(const {mesh,slot} of parts){
+    let px=n.x,pz=n.y,py=bob*human;
+    if(/^(trousers|boots|leather)[LR]$/.test(slot)){
+      const side=slot.endsWith('L')?-1:1,tau=Math.PI*2,t=((stridePhase+(side>0?Math.PI:0))%tau+tau)%tau/tau;
+      const swing=t>=.58,progress=swing?(t-.58)/.42:t/.58;
+      const fore=(swing?-Math.cos(progress*Math.PI):1-2*progress)*1.15*gait,lift=swing?Math.pow(Math.sin(progress*Math.PI),1.5)*1.2*gait:0;
+      px+=Math.sin(turn)*fore*human;pz+=Math.cos(turn)*fore*human;py+=lift*human;
+    }
+    this.draw(mesh,px,py,pz,human,human,human,colors[slot],turn,this.opt?.lowTextures?null:materials[slot]||null,phase*.002,phase*.003);
+  }
  }
 
  canSee(o,padding=0,occlusion=false){const v=this.visibility;return !v||Math.hypot(o.x-v.x,o.y-v.y)<=v.radius-padding&&(!occlusion||!R.lineBlocked(v.x,v.y,o.x,o.y));}
@@ -129,12 +141,8 @@ class Scene extends window.HoMoWBeta3D.Scene{
  this.visibility=window.HoMoWMaze?.contains(w.state)?{x:this.visual.state.x,y:this.visual.state.y,radius:390,start:275}:null;
  if(this.cpu)this.faces=[];else{const v=this.visibility;this.gl.uniform4f(this.u.viewLimit,v?.x||0,v?.y||0,v?.radius||0,v?.start||0);this.gl.clearColor(...(v?[89/255,99/255,88/255,1]:[.39,.46,.34,1]));this.gl.clear(this.gl.COLOR_BUFFER_BIT|this.gl.DEPTH_BUFFER_BIT);}
  const cluster=R.clusterOf(w.state),area=R.DUNGEONS.find(d=>'dungeon:'+d.id===cluster)?.arena||R.clusterAt(w.state.x,w.state.y);
- const player=this.visual.state,focusY=player.mounted?54:30,focus=this.project(player.x,player.y,focusY);
- const sightScale=2.4;
- this.cutaway={x:player.x,y:focusY,z:player.y,scale:sightScale,screenX:focus.x,screenY:focus.y,
-   rx:34*sightScale*this.width/(2*this.spanX),ry:43*sightScale*this.height/(2*this.spanY),
-   depth:(player.x*this.camera.s+player.y*this.camera.c)*.8+focusY*.6};
- this.gpuCover=null;
+ const player=this.visual.state,focusY=player.mounted?54:30,heroWorld={...w,state:player,facing:this.visual.facing,gait:this.visual.gait,turnRate:this.visual.rate};
+ this.prepareHero(heroWorld);this.gpuCover=null;
  const show=o=>R.clusterOf(o)===cluster&&this.visibleAt(o)&&this.canSee(o,0,true);
  const staticKey=this.cpu?[this.width,this.height,this.cx,this.cz,this.yaw,this.zoom,this.opt.shadows,this.opt.lowTextures,player.x,player.y,focusY,cluster,w.nodes.map(n=>n.charges).join(',')].join(':'):null;
  if(this.cpu&&staticKey===this.staticKey){this.faces=this.cachedFaces.slice();this.visible=this.cachedVisible;}else{
@@ -185,7 +193,7 @@ class Scene extends window.HoMoWBeta3D.Scene{
    this.tag((m.encounterSlot!==undefined?'◆ ':'')+t.name+' · '+(t.level||1),m.x,m.y,top+10,m.hp/t.hp,true);this.visible++;}
  for(const d of w.state.drops){if(show(d))this.draw('cube',d.x,7,d.y,15,14,15,'d2b36f');}
  for(const p of w.projectiles){if(show(p))this.draw('sphere',p.x,28,p.y,p.magic?7:3,p.magic?7:3,9,p.magic?'c8a6e5':'e8d9af');}
- const playerLabel=this.hero({...w,state:this.visual.state,facing:this.visual.facing,gait:this.visual.gait,turnRate:this.visual.rate});this.combat({...w,effects:[]});for(const e of effects){if(!this.visibleAt(e)||!this.canSee(e,0,true))continue;if(e.type==='burst')this.ring(e.x,e.y,e.radius||80,'e0c78e');else if(['hit','damage','heal','gather'].includes(e.type))this.tag(e.type==='gather'?'+'+e.amount:(e.type==='heal'?'+':'')+(e.value||''),e.x,e.y,70+(1-e.life)*45,1,e.type==='damage');}this.tag((w.onlineName||'Мандрівник')+' · '+w.state.level,this.visual.state.x,this.visual.state.y,playerLabel,w.state.hp/R.maxHp(w.state));
+ const playerLabel=this.hero(heroWorld);this.combat({...w,effects:[]});for(const e of effects){if(!this.visibleAt(e)||!this.canSee(e,0,true))continue;if(e.type==='burst')this.ring(e.x,e.y,e.radius||80,'e0c78e');else if(['hit','damage','heal','gather'].includes(e.type))this.tag(e.type==='gather'?'+'+e.amount:(e.type==='heal'?'+':'')+(e.value||''),e.x,e.y,70+(1-e.life)*45,1,e.type==='damage');}this.tag((w.onlineName||'Мандрівник')+' · '+w.state.level,this.visual.state.x,this.visual.state.y,playerLabel,w.state.hp/R.maxHp(w.state));
  for(let i=this.labelCount;i<this.labels.length;i++)this.labels[i].hidden=true;
  if(this.cpu)this.flush();
  }
